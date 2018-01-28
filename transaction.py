@@ -78,6 +78,7 @@ class Transaction:
     # Returns a new transaction that excludes the section of sx_type
     def strip_section(self, sx_type):
         new_sections = [i for i in self.sections if i.type != sx_type]
+        return Transaction(new_sections)
 
 # Take a byte array and return a transaction object
 def bytes_to_tx(txbytes):
@@ -117,7 +118,6 @@ s = Section(sectionType.BURN, [d])
 t = Transaction([s])
 
 
-print(bytearray([DATA_INDICATOR]), "\n\n")
 print(t.tx_to_bytes())
 print(bytes_to_tx(t.tx_to_bytes()).tx_to_bytes())
 print(t)
@@ -132,7 +132,6 @@ s2 = Section(sectionType.PAINT_OUTPUTS, [d])
 t2 = Transaction([s1, s2])
 
 
-print(bytearray([DATA_INDICATOR]), "\n\n")
 print(t2.tx_to_bytes())
 print(bytes_to_tx(t2.tx_to_bytes()).tx_to_bytes())
 print(t)
