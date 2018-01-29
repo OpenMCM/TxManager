@@ -3,7 +3,8 @@ from enum import Enum
 from Crypto.Hash import SHA256
 import ecdsa
 
-DATUM_SEP       = 0xaa
+DATUM_INT       = 0x55  # Separator for values of a tuple
+DATUM_SEP       = 0xaa  # Separator between n-tuples of data
 DATA_END        = 0x7f
 TX_BEGIN        = 0xff
 TX_END          = 0x00
@@ -34,6 +35,8 @@ def st_to_bytes(type):
     return bytearray([0x00])
 
 def byte_to_st(byte):
+    if(byte > 17):
+        return -1
     return sectionType(byte)
 
 # A datum is an n-element list of 32-byte values.
@@ -45,7 +48,7 @@ class Datum:
     def dx_to_bytes(self):
         running_bytes = bytearray([])
         for i in self.dx:
-            running_bytes += bytearray([DATUM_SEP]) + i
+            running_bytes += bytearray([DATUM_INT]) + i
         return running_bytes
 
 class Section:
@@ -56,7 +59,7 @@ class Section:
     def data_to_bytes(self):
         running_bytes = bytearray([])
         for i in self.data:
-            running_bytes += i.dx_to_bytes()
+            running_bytes += bytearray([DATUM_SEP]) + i.dx_to_bytes()
         return running_bytes
 
     def sx_to_bytes(self):
@@ -80,49 +83,85 @@ class Transaction:
         new_sections = [i for i in self.sections if i.type != sx_type]
         return Transaction(new_sections)
 
-# Take a byte array and return a transaction object
 def bytes_to_tx(txbytes):
-    curr_byte = txbytes[0]
+    # Returns (int, Datum)
+    def read_datum(index, txbytes):
+        i = index
 
-    running_tx = Transaction([])
+        datum = []
+
+        while(txbytes[i] == DATUM_INT):
+            i += 1
+            doot = txbytes[i : i + 32]
+            i += 32
+            datum += [doot]
+
+        return (i, Datum(datum))
+
+    # Returns (int, [Datum])
+    def read_data(index, txbytes):
+        i = index
+
+        data = []
+
+        while(txbytes[i] == DATUM_SEP):
+            i += 1
+            i, datum = read_datum(i, txbytes)
+            data += [datum]
+
+        return (i, data)
+
+    # Returns (int, section)
+    def read_section(index, txbytes, secType):
+        i = index
+
+        i, secData = read_data(i, txbytes)
+        return (i, Section(secType, secData))
+
+    # Returns (int, [section])
+    def read_sections(index, txbytes):
+        i = index
+        sections = []
+        while(txbytes[i] != TX_END):
+            st = byte_to_st(txbytes[i])
+            i += 1
+            i, intersections = read_section(i, txbytes, st)
+            sections += [intersections]
+            i += 1
+
+        return (i, sections)
+    i = 0
+    curr_byte = txbytes[i]
+    i += 1
 
     if(curr_byte != TX_BEGIN):
         # Throw an error
         print("Error: invalid transaction ", txbytes)
-    i = 1
-    while txbytes[i] != TX_END:
-        # Get transaction section type
-        sx = Section(byte_to_st(txbytes[i]), [])
-        i += 1
+    i, sections = read_sections(i, txbytes)
 
-        while txbytes[i] != DATA_END:
-            if(txbytes[i] == DATUM_SEP):
-                # Read 32 bytes
-                datum_bytes = txbytes[i+1:i+33]
-                sx.data += [Datum([datum_bytes])]
-                i += 33
-        i += 1
+    return Transaction(sections)
 
-        running_tx.sections += [sx]
-    return running_tx
 
 # Take a transaction as argument, return a bool indicating its validity.
 def transaction_is_valid(tx):
+    # Alright, so we need a 'for' loop to iterate through the sections
+
+    # If we come across a signature, hash the catted bytes of all previous
+    # Sections and assert that it matches the first data point in
     print("Placeholder")
 
 # Simple test vector
 # TODO: Write actual test cases for this
 
 d = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
-s = Section(sectionType.BURN, [d])
+dp = Datum([b'gggggggggggggggggggggggggggggggg'])
+s = Section(sectionType.BURN, [d, dp])
 t = Transaction([s])
 
-
+print("Not decoded:")
 print(t.tx_to_bytes())
+print("Decoded:")
 print(bytes_to_tx(t.tx_to_bytes()).tx_to_bytes())
-print(t)
-
-print("\n\n", byte_to_st(0x01))
 
 
 d1 = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
@@ -131,8 +170,9 @@ d2 = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeee
 s2 = Section(sectionType.PAINT_OUTPUTS, [d])
 t2 = Transaction([s1, s2])
 
-
+print("Not decoded: ")
 print(t2.tx_to_bytes())
+print("Decoded:")
 print(bytes_to_tx(t2.tx_to_bytes()).tx_to_bytes())
 print(t)
 
