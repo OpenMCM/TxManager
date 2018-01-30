@@ -3,8 +3,16 @@ from enum import Enum
 from Crypto.Hash import SHA256
 import ecdsa
 
-DATUM_INT       = 0x55  # Separator for values of a tuple
+DATUM_SQUIRT    = 0x04  # Indicator of a 4-byte value in a tuple
+DATUM_INCHWORM  = 0x08  # Indicator of an 8-byte value in a tuple
+DATUM_SHORT     = 0x10  # Indicator of a 16-byte value in a tuple
+DATUM_INT       = 0x20  # Indicator of a 32-byte value in a tuple
+DATUM_LONG      = 0x40  # Indicator of a 64-byte value in a tuple
 DATUM_SEP       = 0xaa  # Separator between n-tuples of data
+
+DATUM_INDICATORS = frozenset((DATUM_SQUIRT, DATUM_INCHWORM,
+                              DATUM_SHORT, DATUM_INT, DATUM_LONG))
+
 DATA_END        = 0x7f
 TX_BEGIN        = 0xff
 TX_END          = 0x00
@@ -48,7 +56,17 @@ class Datum:
     def dx_to_bytes(self):
         running_bytes = bytearray([])
         for i in self.dx:
-            running_bytes += bytearray([DATUM_INT]) + i
+            if(len(i) == 4):
+                running_bytes += bytearray([DATUM_SQUIRT]) + i
+            elif(len(i) == 8):
+                running_bytes += bytearray([DATUM_INCHWORM]) + i
+            elif(len(i) == 16):
+                running_bytes += bytearray([DATUM_SHORT]) + i
+            elif(len(i) == 32):
+                running_bytes += bytearray([DATUM_INT]) + i
+            elif(len(i) == 64):
+                running_bytes += bytearray([DATUM_LONG]) + i
+
         return running_bytes
 
 class Section:
@@ -90,10 +108,14 @@ def bytes_to_tx(txbytes):
 
         datum = []
 
-        while(txbytes[i] == DATUM_INT):
+        while(txbytes[i] in DATUM_INDICATORS):
+            word_size = txbytes[i]
             i += 1
-            doot = txbytes[i : i + 32]
-            i += 32
+            # We assume here that the respective value in DATUM_INDICATORS
+            # represents the size of the data we're reading. PLEASE DON'T
+            # VIOLATE THIS it makes my life so easy thnx
+            doot = txbytes[i : i + word_size]
+            i += word_size
             datum += [doot]
 
         return (i, Datum(datum))
@@ -148,6 +170,8 @@ def transaction_is_valid(tx):
 
     # If we come across a signature, hash the catted bytes of all previous
     # Sections and assert that it matches the first data point in
+
+    # Preliminary version: Only works with non-wildcard shuffles
     print("Placeholder")
 
 # Simple test vector
@@ -165,9 +189,9 @@ print(bytes_to_tx(t.tx_to_bytes()).tx_to_bytes())
 
 
 d1 = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
-s1 = Section(sectionType.PAINT_INPUTS, [d])
+s1 = Section(sectionType.PAINT_INPUTS, [d1])
 d2 = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
-s2 = Section(sectionType.PAINT_OUTPUTS, [d])
+s2 = Section(sectionType.PAINT_OUTPUTS, [d1, d2])
 t2 = Transaction([s1, s2])
 
 print("Not decoded: ")
