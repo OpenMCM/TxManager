@@ -66,7 +66,6 @@ class Datum:
                 running_bytes += bytearray([DATUM_INT]) + i
             elif(len(i) == 64):
                 running_bytes += bytearray([DATUM_LONG]) + i
-
         return running_bytes
 
 class Section:
@@ -100,6 +99,12 @@ class Transaction:
     def strip_section(self, sx_type):
         new_sections = [i for i in self.sections if i.type != sx_type]
         return Transaction(new_sections)
+
+    def get_section(self, sx_type):
+        for sx in sections:
+            # Possible error: what if sx_type is invalid?
+            if(sx.type == sx_type):
+                return sx
 
 def bytes_to_tx(txbytes):
     # Returns (int, Datum)
@@ -172,6 +177,8 @@ def transaction_is_valid(tx):
     # Sections and assert that it matches the first data point in
 
     # Preliminary version: Only works with non-wildcard shuffles
+    for i in tx.sections:
+        print(i.type)
     print("Placeholder")
 
 # Simple test vector

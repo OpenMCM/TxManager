@@ -47,6 +47,22 @@ class TXHashChain:
             else:
                 curr_hash = curr_block[0]
 
+    # Takes a (txhash, output_index) as argument
+    # Returns (owner, color, quantity) or (owner, quantity)
+    #   - Note: Will only return (owner, quantity) if we allow for black coins!
+    def find_owner_and_quantity_by_quote(self, quote):
+        txhash = quote[0]
+        output_index = quote[1]
+
+        tx = find_tx_by_hash(txhash)
+
+        # Get transaction output section
+        outputs = tx.get_section(sectionType.OUTPUT)
+
+        # The output is alread organized as a list of (o, c, q), so we can
+        # just return the index in the output from here.
+        return outputs[output_index]
+
 
 d = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
 s = Section(sectionType.BURN, [d])
