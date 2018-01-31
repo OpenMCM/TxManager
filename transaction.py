@@ -29,7 +29,7 @@ class sectionType(Enum):
     COINCOLOR = 9
     MINT_PAINT = 10
     AUTHED_MINTERS = 11
-    DEAUTHER_MINTERS = 12
+    DEAUTHED_MINTERS = 12
     NONCE = 13
     PAINT_INPUTS = 14
     PAINT_OUTPUTS = 15
@@ -46,6 +46,23 @@ def byte_to_st(byte):
     if(byte > 17):
         return -1
     return sectionType(byte)
+
+# Pretty sure it'll be faster to check for well-formed-ness on the datum level
+# than to have a seperate function that loops through all sections.
+# Takes a [byteArray], returns a bool
+# Transaction quotes (i.e. inputs) have the form (txhash, output_index)
+def input_datum_well_formed(datum):
+    if(len(datum) != 2 or len(datum[0]) != 64 or len(datum[1]) != 4):
+        return false
+    else:
+        return true
+# Basically does the same as input_datum_well_formed, but instead checks
+# for a  (recipient, color, quantity) - like structure
+def output_datum_well_formed(datum):
+    if(len(datum) != 3 or len(datum[0]) != 32 or len(datum[1]) != 32 or len(datum[2]) != 4):
+        return false
+    else:
+        return true
 
 # A datum is an n-element list of 32-byte values.
 # TODO: Allow data of less than 32 bytes
@@ -170,16 +187,90 @@ def bytes_to_tx(txbytes):
 
 
 # Take a transaction as argument, return a bool indicating its validity.
-def transaction_is_valid(tx):
+def transaction_is_valid(txHashChain, tx):
     # Alright, so we need a 'for' loop to iterate through the sections
 
     # If we come across a signature, hash the catted bytes of all previous
     # Sections and assert that it matches the first data point in
 
     # Preliminary version: Only works with non-wildcard shuffles
-    for i in tx.sections:
-        print(i.type)
-    print("Placeholder")
+
+    # A set of the owners of non-wildcard inputs
+    owners = {}
+
+    # A mapping of colors to quantity of coins
+    inputs = {}
+
+    # A mapping of colors to quantities. We don't care about recipients because
+    # -- well, we don't care about recipients. The point of this is to make
+    # sure that coins aren't created out of nowhere
+    outputs = {}
+
+    # A set of sections that we pass by. Note that we don't allow duplicate
+    # sections -- being dumb has a direct consequence (i.e. storing txchain) to
+    # the MCM maintainer.
+    seen_secs = {}
+
+    # A bytearray of catted section bytes that we've passed by so far. When we
+    # encounter a signature, we hash seen_bytes and use that for the sigs.
+    seen_bytes = bytearray([])
+
+    # Takes a set of sectionTypes and a sectionType
+    # Fails if (new in seen)
+    # Else returns seen.add(new)
+    def check_section_duplicate(seen, new):
+        seenP = seen
+        if(new in seenP):
+            # Fail
+            print("Duplicate section: ", new)
+            # How do we fail again?
+        seenP.add(new)
+        return seenP
+
+    for sx in tx.sections:
+        if(sx.type == sectionType.INPUT):
+            seen_secs = check_section_duplicate(seen_secs, sx.type)
+            for dx in sx.data:
+                if(not input_datum_well_formed(dx)):
+                    # Fail
+                    print("Malformed input ", dx)
+                    # How do we fail again?
+                quote = txHashChain.find_owner_and_quantity_by_quote(dx)
+                owner = quote[0]
+                color = quote[1]
+                quantity = int(quote[2])
+                if color in inputs.keys:
+                    inputs[color] += quantity
+                else:
+                    inputs[color] = quantity
+                owners.add(owner)
+                seen_bytes += [sx.sx_to_bytes()]
+        elif(sx.type == sectionType.OUTPUT):
+            seen_secs = check_section_duplicate(seen_secs, sx.type)
+            if(sectionType.INPUT not in seen_secs):
+                # Fail
+                print("Output comes before input! ")
+                # How do we fail again?
+            for dx in sx.data:
+                if(not output_datum_well_formed(dx)):
+                    # Fail
+                    print("Malformed output ", dx)
+                    # How do we fail again?
+                recipient = dx[0]
+                color = dx[1]
+                quantity = int(dx[2])
+                if(color in outputs):
+                    outputs[color] += quantity
+                else:
+                    outputs[color] = quantity
+                seen_bytes += [sx.sx_to_bytes()]
+        elif(sx.type == sectionType.SIGNATURES):
+            seen_secs = check_section_duplicate(seen_secs, sx.type)
+            if(sectionType.OUTPUT not in seen_secs or sectionType.INPUT not in seen_secs):
+                # Fail
+                print("Missing outputs or inputs ", sx)
+                # How do we fail again?
+            running_hash = SHA256(seen_bytes)
 
 # Simple test vector
 # TODO: Write actual test cases for this
