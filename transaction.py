@@ -3,6 +3,7 @@ from enum import Enum
 from Crypto.Hash import SHA256
 import ecdsa
 
+DATUM_BYTE      = 0x01  # Indicator of a 1-byte value in a tuple
 DATUM_SQUIRT    = 0x04  # Indicator of a 4-byte value in a tuple
 DATUM_INCHWORM  = 0x08  # Indicator of an 8-byte value in a tuple
 DATUM_SHORT     = 0x10  # Indicator of a 16-byte value in a tuple
@@ -10,7 +11,7 @@ DATUM_INT       = 0x20  # Indicator of a 32-byte value in a tuple
 DATUM_LONG      = 0x40  # Indicator of a 64-byte value in a tuple
 DATUM_SEP       = 0xaa  # Separator between n-tuples of data
 
-DATUM_INDICATORS = frozenset((DATUM_SQUIRT, DATUM_INCHWORM,
+DATUM_INDICATORS = frozenset((DATUM_BYTE, DATUM_SQUIRT, DATUM_INCHWORM,
                               DATUM_SHORT, DATUM_INT, DATUM_LONG))
 
 DATA_END        = 0x7f
