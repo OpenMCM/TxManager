@@ -53,14 +53,33 @@ def byte_to_st(byte):
 # Takes a [byteArray], returns a bool
 # Transaction quotes (i.e. inputs) have the form (txhash, output_index)
 def input_datum_well_formed(datum):
-    if(len(datum) != 2 or len(datum[0]) != 64 or len(datum[1]) != 4):
+    if(len(datum.dx) != 2 or len(datum.dx[0]) != 64 or len(datum.dx[1]) != 4):
         return false
     else:
         return true
+
 # Basically does the same as input_datum_well_formed, but instead checks
 # for a  (recipient, color, quantity) - like structure
 def output_datum_well_formed(datum):
-    if(len(datum) != 3 or len(datum[0]) != 32 or len(datum[1]) != 32 or len(datum[2]) != 4):
+    if(len(datum.dx) != 3 or len(datum.dx[0]) != 32 or len(datum.dx[1]) != 32 or len(datum.dx[2]) != 4):
+        return false
+    else:
+        return true
+
+def coincolor_section_well_formed(section):
+    if(len(section.data) != 1 or len(section.data[0].dx) != 1 or len(section.data[0].dx[0]) != 32):
+        return false
+    else:
+        return true
+
+def authed_minter_datum_well_formed(datum):
+    if(len(datum.dx) != 1 or len(datum.dx[0]) != 32):
+        return false
+    else:
+        return true
+
+def deauthed_minter_datum_well_formed(datum):
+    if(len(datum.dx) != 1 or len(datum.dx[0]) != 32):
         return false
     else:
         return true
@@ -216,27 +235,35 @@ def transaction_is_valid(txHashChain, tx):
     # encounter a signature, we hash seen_bytes and use that for the sigs.
     seen_bytes = bytearray([])
 
+    # In case we come across a 'coincolor' section, we need to remember which
+    # color is in question.
+    coin_color = None
+
+    # Of course, we need to keep track of the minters who are being authorize
+    authed_minters= {}
+
+    # And also those who are being deauthorized.
+    deauthed_minters = {}
+
     # Takes a set of sectionTypes and a sectionType
     # Fails if (new in seen)
     # Else returns seen.add(new)
     def check_section_duplicate(seen, new):
-        seenP = seen
-        if(new in seenP):
+        if(new in seen):
             # Fail
             print("Duplicate section: ", new)
             # How do we fail again?
-        seenP.add(new)
-        return seenP
 
     for sx in tx.sections:
         if(sx.type == sectionType.INPUT):
-            seen_secs = check_section_duplicate(seen_secs, sx.type)
-            for dx in sx.data:
-                if(not input_datum_well_formed(dx)):
+            check_section_duplicate(seen_secs, sx.type)
+            seen_secs.add(sx.type)
+            for datum in sx.data:
+                if(not input_datum_well_formed(datum)):
                     # Fail
-                    print("Malformed input ", dx)
+                    print("Malformed input ", datum)
                     # How do we fail again?
-                quote = txHashChain.find_owner_and_quantity_by_quote(dx)
+                quote = txHashChain.find_owner_and_quantity_by_quote(datum)
                 owner = quote[0]
                 color = quote[1]
                 quantity = int(quote[2])
@@ -247,31 +274,61 @@ def transaction_is_valid(txHashChain, tx):
                 owners.add(owner)
                 seen_bytes += [sx.sx_to_bytes()]
         elif(sx.type == sectionType.OUTPUT):
-            seen_secs = check_section_duplicate(seen_secs, sx.type)
+            check_section_duplicate(seen_secs, sx.type)
+            seen_secs.add(sx.type)
             if(sectionType.INPUT not in seen_secs):
                 # Fail
                 print("Output comes before input! ")
                 # How do we fail again?
-            for dx in sx.data:
+            for datum in sx.data:
                 if(not output_datum_well_formed(dx)):
                     # Fail
                     print("Malformed output ", dx)
                     # How do we fail again?
-                recipient = dx[0]
-                color = dx[1]
-                quantity = int(dx[2])
+                recipient = datum.dx[0]
+                color = datum.dx[1]
+                quantity = int(datum.dx[2])
                 if(color in outputs):
                     outputs[color] += quantity
                 else:
                     outputs[color] = quantity
                 seen_bytes += [sx.sx_to_bytes()]
         elif(sx.type == sectionType.SIGNATURES):
-            seen_secs = check_section_duplicate(seen_secs, sx.type)
+            check_section_duplicate(seen_secs, sx.type)
+            seen_secs.add(sx.type)
             if(sectionType.OUTPUT not in seen_secs or sectionType.INPUT not in seen_secs):
                 # Fail
                 print("Missing outputs or inputs ", sx)
                 # How do we fail again?
             running_hash = SHA256(seen_bytes)
+            # TODO: Finish this!!!!!
+        elif(sx.type == sectionType.COINCOLOR):
+            check_section_duplicate(seen_secs, sx.type)
+            seen_secs.add(sx.type)
+            if(not coincolor_section_well_formed(sx)):
+                # Fail
+                print("Malformed coincolor section ", sx)
+                # Shit, we gotta return 'false'
+            color = sx.data[0].dx[0]
+            coin_color = color
+        elif(sx.type == sectionType.AUTHED_MINTERS):
+            check_section_duplicate(seen_secs, sx.type)
+            seen_secs.add(sx.type)
+            for datum in sx.data:
+                if(not authed_minter_datum_well_formed(dx)):
+                    # Fail
+                    print("Malformed authed_minter section ", sx)
+                    return false
+                authed_minters.add(datum.dx[0])
+        elif(sx.type == sectionType.DEAUTHED_MINTERS):
+            check_section_duplicate(seen_secs, sx.type)
+            seen_secs.add(sx.type)
+            for datum in sx.data:
+                if(not deauthed_minter_datum_well_formed(dx)):
+                    # Fail
+                    print("Malformed deauthed_minter section ", sx)
+                    return false
+                deauthed_minters.add(datum.dx[0])
 
 # Simple test vector
 # TODO: Write actual test cases for this

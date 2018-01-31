@@ -63,6 +63,11 @@ class TXHashChain:
         # just return the index in the output from here.
         return outputs[output_index]
 
+    # Iterate through txHashChain and verify that a given nonce has never
+    # been used before
+    def nonce_unused(self, nonce):
+        print("Placeholder")
+
 
 d = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
 s = Section(sectionType.BURN, [d])
