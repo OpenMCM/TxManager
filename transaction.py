@@ -35,10 +35,11 @@ class sectionType(Enum):
     PAINT_INPUTS = 14
     PAINT_OUTPUTS = 15
     MINT_OUTPUTS = 16
-    BURN = 17
+    SIG_MINT = 17
+    SIG_PAINT = 18
 
 def st_to_bytes(type):
-    for i in range(1, 18):
+    for i in range(1, len(sectionType.members()) + 1):
         if(i == type.value):
             return bytearray([i])
     return bytearray([0x00])
@@ -226,6 +227,10 @@ def transaction_is_valid(txHashChain, tx):
     # sure that coins aren't created out of nowhere
     outputs = {}
 
+    # Same as outputs, but we'll definitely have to seperate newly minted coins
+    # from previously minted ones.
+    mint_outputs = {}
+
     # A set of sections that we pass by. Note that we don't allow duplicate
     # sections -- being dumb has a direct consequence (i.e. storing txchain) to
     # the MCM maintainer.
@@ -311,6 +316,7 @@ def transaction_is_valid(txHashChain, tx):
                 # Shit, we gotta return 'false'
             color = sx.data[0].dx[0]
             coin_color = color
+            seen_bytes += [sx.sx_to_bytes()]
         elif(sx.type == sectionType.AUTHED_MINTERS):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
@@ -320,6 +326,7 @@ def transaction_is_valid(txHashChain, tx):
                     print("Malformed authed_minter section ", sx)
                     return false
                 authed_minters.add(datum.dx[0])
+            seen_bytes += [sx.sx_to_bytes()]
         elif(sx.type == sectionType.DEAUTHED_MINTERS):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
@@ -329,6 +336,41 @@ def transaction_is_valid(txHashChain, tx):
                     print("Malformed deauthed_minter section ", sx)
                     return false
                 deauthed_minters.add(datum.dx[0])
+            seen_bytes += [sx.sx_to_bytes()]
+        elif(sx.type == sectionType.MINT_OUTPUTS):
+            check_section_duplicate(seen_secs, sx.type)
+            seen_secs.add(sx.type)
+            # This section has the same structure as output!
+            for datum in sx.data:
+                if(not output_datum_well_formed(dx)):
+                    # Fail
+                    print("Malformed output ", dx)
+                    # How do we fail again?
+                recipient = datum.dx[0]
+                color = datum.dx[1]
+                quantity = int(datum.dx[2])
+                if(color in outputs):
+                    outputs[color] += quantity
+                else:
+                    outputs[color] = quantity
+                seen_bytes += [sx.sx_to_bytes()]
+        elif(sx.type == sectionType.SIG_MINT):
+            check_section_duplicate(seen_secs, sx.type)
+            seen_secs.add(sx.type)
+
+            # Assert well-formed-ness
+            # Assert that sx.data[0].dx[0] = HASH(seen_bytes)
+            # For each signature
+            #   - Validate signature
+            #   - Find all coins that signer is authed for
+            # Take union of all sets of mintable coins
+            # Assert that {coins being minted} - {mintable coins} = {}
+            running_hash = SHA256(seen_bytes)
+            noted_hash = sx.data[0].dx[0]
+            if(running_hash != noted_hash):
+                print("Hash mismatch between ", running_hash, " and ", noted_hash)
+
+            for signature in sx.data[1:len(sx.data)]
 
 # Simple test vector
 # TODO: Write actual test cases for this
