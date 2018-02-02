@@ -47,6 +47,45 @@ class TXHashChain:
             else:
                 curr_hash = curr_block[0]
 
+        return None
+
+    # Verifies that pubkeyhash is an authorized minter of the color specified
+    # at txhash. Also verifies that pubkeyhash has not been deauthorized since
+    # txhash was issued. Returns a set of colors.
+    def get_authed_color(self, pubkeyhash, txhash):
+        curr_hash = self.most_recent_block
+
+        authorized_colors = {}
+        deauthorized_colors = {}
+
+        while curr_hash != bottom_hash:
+            curr_block = self.chain[curr_hash]
+            curr_tx = curr_block[1]
+            curr_tx_hash = hash(curr_tx.tx_to_bytes())
+            if(curr_tx_hash == txhash):
+                color_section = curr_tx.get_section(sx.COINCOLOR)
+                color = color_section.data[0].dx[0]
+                auth_section = curr_tx.get_section(sx.AUTHED_MINTERS)
+                if(auth_section == None):
+                    print("Error: transaction", txhash, "Does not authorize any minters")
+                    return None
+                for minter in auth_section.data:
+                    if minter.dx[0] == pubkeyhash:
+                        authorized_colors.add(color)
+            else:
+                deauth_section = curr_tx.get_section(sx.DEAUTHED_MINTERS)
+                if(deauth_section != None):
+                    color_section = curr_tx.get_section(sx.COINCOLOR)
+                    color = color_section.data[0].dx[0]
+                    for minter in deauth_section.data:
+                        if minter.dx[0] == pubkeyhash:
+                            deauthorized_colors.add(color)
+
+                curr_hash = curr_block[0]
+
+        return authorized_colors.difference(deauthorized_colors)
+
+
     # Takes a (txhash, output_index) as argument
     # Returns (owner, color, quantity) or (owner, quantity)
     #   - Note: Will only return (owner, quantity) if we allow for black coins!

@@ -11,6 +11,10 @@ def gen_privkey():
     sk = SigningKey.generate(curve=NIST256p)
     return sk
 
+def gen_pubkey_from_bytes(bytes):
+    vk = VerifyingKey.from_string(bytes, curve=NIST256p)
+    return vk
+
 def gen_pubkey(privkey):
     return privkey.get_verifying_key()
 

@@ -144,6 +144,13 @@ class Transaction:
             if(sx.type == sx_type):
                 return sx
 
+    def tx_contains_section(self, sx.type):
+        for sx in sections:
+            # Possible error: what if sx_type is invalid?
+            if(sx.type == sx_type):
+                return True
+        return False
+
 def bytes_to_tx(txbytes):
     # Returns (int, Datum)
     def read_datum(index, txbytes):
@@ -244,8 +251,8 @@ def transaction_is_valid(txHashChain, tx):
     # color is in question.
     coin_color = None
 
-    # Of course, we need to keep track of the minters who are being authorize
-    authed_minters= {}
+    # Of course, we need to keep track of the minters who are being authorized
+    authed_minters = {}
 
     # And also those who are being deauthorized.
     deauthed_minters = {}
@@ -257,7 +264,7 @@ def transaction_is_valid(txHashChain, tx):
         if(new in seen):
             # Fail
             print("Duplicate section: ", new)
-            # How do we fail again?
+            return
 
     for sx in tx.sections:
         if(sx.type == sectionType.INPUT):
@@ -298,15 +305,43 @@ def transaction_is_valid(txHashChain, tx):
                 else:
                     outputs[color] = quantity
                 seen_bytes += [sx.sx_to_bytes()]
+
         elif(sx.type == sectionType.SIGNATURES):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
             if(sectionType.OUTPUT not in seen_secs or sectionType.INPUT not in seen_secs):
                 # Fail
                 print("Missing outputs or inputs ", sx)
-                # How do we fail again?
+                return False
             running_hash = SHA256(seen_bytes)
-            # TODO: Finish this!!!!!
+            noted_hash = sx.data[0].dx[0]
+
+            if(running_hash != noted_hash):
+                print("Hash mismatch between ", running_hash, " and ", noted_hash)
+
+            addresses_signed = {}
+
+            for signature in sx.data[1:]:
+                pubkey = signature[0]
+                sig = signature[1]
+                proof = signature[2]
+                addresses_signed.add(hash(pubkey))
+                try:
+                    vk = gen_pubkey_from_bytes(pubkey)
+                    verify(pubkey, noted_hash, sig)
+                except:
+                    # Signature is invalid! Return False
+                    print("Invalid signature: ", signature)
+                    return False
+
+            inputs_owners = set(inputs.keys)
+
+            leftover_owners = inputs_owners.difference(addresses_signed)
+
+            if(leftover_owners != {}):
+                print("Not enough signatures to validate signature")
+                return False
+
         elif(sx.type == sectionType.COINCOLOR):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
@@ -317,6 +352,7 @@ def transaction_is_valid(txHashChain, tx):
             color = sx.data[0].dx[0]
             coin_color = color
             seen_bytes += [sx.sx_to_bytes()]
+
         elif(sx.type == sectionType.AUTHED_MINTERS):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
@@ -327,6 +363,7 @@ def transaction_is_valid(txHashChain, tx):
                     return false
                 authed_minters.add(datum.dx[0])
             seen_bytes += [sx.sx_to_bytes()]
+
         elif(sx.type == sectionType.DEAUTHED_MINTERS):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
@@ -349,10 +386,8 @@ def transaction_is_valid(txHashChain, tx):
                 recipient = datum.dx[0]
                 color = datum.dx[1]
                 quantity = int(datum.dx[2])
-                if(color in outputs):
-                    outputs[color] += quantity
-                else:
-                    outputs[color] = quantity
+                if(color not in outputs):
+                    mint_outputs.add(color)
                 seen_bytes += [sx.sx_to_bytes()]
         elif(sx.type == sectionType.SIG_MINT):
             check_section_duplicate(seen_secs, sx.type)
@@ -367,10 +402,46 @@ def transaction_is_valid(txHashChain, tx):
             # Assert that {coins being minted} - {mintable coins} = {}
             running_hash = SHA256(seen_bytes)
             noted_hash = sx.data[0].dx[0]
+
+            colors_authorized_to_mint = {}
+
             if(running_hash != noted_hash):
                 print("Hash mismatch between ", running_hash, " and ", noted_hash)
 
-            for signature in sx.data[1:len(sx.data)]
+            # Signatures of mints are structured as
+            # (pubkey, signature, txhash(proof of authorization))
+            for signature in sx.data[1:]:
+                pubkey = signature[0]
+                sig = signature[1]
+                proof = signature[2]
+                try:
+                    vk = gen_pubkey_from_bytes(pubkey)
+                    verify(pubkey, noted_hash, sig)
+                except:
+                    # Signature is invalid! Return False
+                    print("Invalid signature: ", signature)
+                    return False
+                # If we got here, then the signature is valid! Now we need to
+                # get all of the colors that this signature is authorized for:
+                proof_transaction = txHashChain.find_tx_by_hash(proof)
+                if(proof_transaction == None):
+                    # Oh noes! The transaction they quoted doesn't exist!
+                    print("Nonexistent proof-of-authorization", proof)
+                    return False
+
+                pubkeyhash = hash(pubkey)
+
+                authed_colors = txHashChain.get_authed_color(pubkeyhash, proof)
+
+                colors_authorized_to_mint.union(authed_colors)
+
+            leftover_minted = mint_outputs.difference(colors_authorized_to_mint)
+
+            if(leftover_minted != {}):
+                print("Colors being minted without an authorized signature")
+                return False
+
+
 
 # Simple test vector
 # TODO: Write actual test cases for this
