@@ -1,5 +1,5 @@
 from Crypto.Hash import SHA256
-from ecdsa import SigningKey, NIST256p
+from ecdsa import SigningKey, NIST256p, VerifyingKey
 
 # Take in bytes, output SHA256(bytes)
 def hash(bytes):
@@ -24,6 +24,7 @@ def sign(privkey, message):
 def verify(pubkey, hash, sig):
     return pubkey.verify(sig, hash)
 
+"""
 message = hash(b"message")
 print(''.join('{:02x}'.format(x) for x in message))
 
@@ -34,3 +35,4 @@ print(''.join('{:02x}'.format(x) for x in sign(sk, message)))
 
 print(verify(pk, message, sign(sk, message)))
 print(verify(pk, message, sign(sk, hash(b"Fleeple"))))
+"""

@@ -20,8 +20,15 @@ class TXHashChain:
         self.most_recent_block = bottom_block_hash
         self.chain = {bottom_block_hash:(bottom_hash, bottom_tx)}
 
+    # Takes a transaction, tries to insert it. Returns a bool denoting success.
+    # Phew. That was hard
     def insert_tx(self, tx):
         # Assume tx is a Transaction object
+
+        # Assert that the transaction is valid before inserting
+        if not transaction_is_valid(self, tx):
+            print("Error: invalid transaction")
+            return False
 
         # Create a new block by catting top_hash || txbytes
         new_block = (self.most_recent_block, tx)
@@ -32,6 +39,7 @@ class TXHashChain:
         # Insert the new block into the chain
         self.chain[new_block_hash] = new_block
         self.most_recent_block = new_block_hash
+        return True
 
     def find_tx_by_hash(self, txhash):
         # Iterate through TXHashChain to find a transaction with the given txhash
@@ -107,7 +115,7 @@ class TXHashChain:
     def nonce_unused(self, nonce):
         print("Placeholder")
 
-
+"""
 d = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
 s = Section(sectionType.BURN, [d])
 t = Transaction([s])
@@ -140,3 +148,4 @@ thc = TXHashChain()
 thc.insert_tx(t)
 thc.insert_tx(t2)
 print(thc.find_tx_by_hash(hash(t2.tx_to_bytes())).tx_to_bytes())
+"""

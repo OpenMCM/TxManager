@@ -39,7 +39,7 @@ class sectionType(Enum):
     SIG_PAINT = 18
 
 def st_to_bytes(type):
-    for i in range(1, len(sectionType.members()) + 1):
+    for i in range(1, len(sectionType) + 1):
         if(i == type.value):
             return bytearray([i])
     return bytearray([0x00])
@@ -55,35 +55,35 @@ def byte_to_st(byte):
 # Transaction quotes (i.e. inputs) have the form (txhash, output_index)
 def input_datum_well_formed(datum):
     if(len(datum.dx) != 2 or len(datum.dx[0]) != 64 or len(datum.dx[1]) != 4):
-        return false
+        return False
     else:
-        return true
+        return True
 
 # Basically does the same as input_datum_well_formed, but instead checks
 # for a  (recipient, color, quantity) - like structure
 def output_datum_well_formed(datum):
     if(len(datum.dx) != 3 or len(datum.dx[0]) != 32 or len(datum.dx[1]) != 32 or len(datum.dx[2]) != 4):
-        return false
+        return False
     else:
-        return true
+        return True
 
 def coincolor_section_well_formed(section):
     if(len(section.data) != 1 or len(section.data[0].dx) != 1 or len(section.data[0].dx[0]) != 32):
-        return false
+        return False
     else:
-        return true
+        return True
 
 def authed_minter_datum_well_formed(datum):
     if(len(datum.dx) != 1 or len(datum.dx[0]) != 32):
-        return false
+        return False
     else:
-        return true
+        return True
 
 def deauthed_minter_datum_well_formed(datum):
     if(len(datum.dx) != 1 or len(datum.dx[0]) != 32):
-        return false
+        return False
     else:
-        return true
+        return True
 
 # A datum is an n-element list of 32-byte values.
 # TODO: Allow data of less than 32 bytes
@@ -144,7 +144,7 @@ class Transaction:
             if(sx.type == sx_type):
                 return sx
 
-    def tx_contains_section(self, sx.type):
+    def tx_contains_section(self, sx_type):
         for sx in sections:
             # Possible error: what if sx_type is invalid?
             if(sx.type == sx_type):
@@ -241,7 +241,7 @@ def transaction_is_valid(txHashChain, tx):
     # A set of sections that we pass by. Note that we don't allow duplicate
     # sections -- being dumb has a direct consequence (i.e. storing txchain) to
     # the MCM maintainer.
-    seen_secs = {}
+    seen_secs = set()
 
     # A bytearray of catted section bytes that we've passed by so far. When we
     # encounter a signature, we hash seen_bytes and use that for the sigs.
@@ -252,7 +252,7 @@ def transaction_is_valid(txHashChain, tx):
     coin_color = None
 
     # Of course, we need to keep track of the minters who are being authorized
-    authed_minters = {}
+    authed_minters = set()
 
     # And also those who are being deauthorized.
     deauthed_minters = {}
@@ -267,7 +267,7 @@ def transaction_is_valid(txHashChain, tx):
             return
 
     for sx in tx.sections:
-        if(sx.type == sectionType.INPUT):
+        if(sx.type == sectionType.INPUTS):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
             for datum in sx.data:
@@ -286,7 +286,7 @@ def transaction_is_valid(txHashChain, tx):
                 owners.add(owner)
                 seen_bytes += [sx.sx_to_bytes()]
 
-        elif(sx.type == sectionType.OUTPUT):
+        elif(sx.type == sectionType.OUTPUTS):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
             if(sectionType.INPUT not in seen_secs):
@@ -349,10 +349,10 @@ def transaction_is_valid(txHashChain, tx):
             if(not coincolor_section_well_formed(sx)):
                 # Fail
                 print("Malformed coincolor section ", sx)
-                # Shit, we gotta return 'false'
+                return False
             color = sx.data[0].dx[0]
             coin_color = color
-            seen_bytes += [sx.sx_to_bytes()]
+            seen_bytes += sx.sx_to_bytes()
 
         elif(sx.type == sectionType.AUTHED_MINTERS):
             check_section_duplicate(seen_secs, sx.type)
@@ -362,12 +362,12 @@ def transaction_is_valid(txHashChain, tx):
             # datum in the section should be the signature of an authorized minter
 
             for datum in sx.data:
-                if(not authed_minter_datum_well_formed(dx)):
+                if(not authed_minter_datum_well_formed(datum)):
                     # Fail
                     print("Malformed authed_minter section ", sx)
-                    return false
-                authed_minters.add(datum.dx[0])
-            seen_bytes += [sx.sx_to_bytes()]
+                    return False
+                authed_minters.add(bytes(datum.dx[0]))
+            seen_bytes += sx.sx_to_bytes()
 
         elif(sx.type == sectionType.DEAUTHED_MINTERS):
             check_section_duplicate(seen_secs, sx.type)
@@ -376,7 +376,7 @@ def transaction_is_valid(txHashChain, tx):
                 if(not deauthed_minter_datum_well_formed(dx)):
                     # Fail
                     print("Malformed deauthed_minter section ", sx)
-                    return false
+                    return False
                 deauthed_minters.add(datum.dx[0])
             seen_bytes += [sx.sx_to_bytes()]
 
@@ -447,15 +447,16 @@ def transaction_is_valid(txHashChain, tx):
             if(leftover_minted != {}):
                 print("Colors being minted without an authorized signature")
                 return False
+    return True        
 
 
 
 # Simple test vector
 # TODO: Write actual test cases for this
-
+"""
 d = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
 dp = Datum([b'gggggggggggggggggggggggggggggggg'])
-s = Section(sectionType.BURN, [d, dp])
+s = Section(sectionType.INPUTS, [d, dp])
 t = Transaction([s])
 
 print("Not decoded:")
@@ -478,4 +479,4 @@ print(t)
 
 print(t2.strip_section(sectionType.PAINT_INPUTS).tx_to_bytes())
 
-print("\n\n", byte_to_st(0x01))
+print("\n\n", byte_to_st(0x01))"""
