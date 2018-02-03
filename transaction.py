@@ -285,6 +285,7 @@ def transaction_is_valid(txHashChain, tx):
                     inputs[color] = quantity
                 owners.add(owner)
                 seen_bytes += [sx.sx_to_bytes()]
+
         elif(sx.type == sectionType.OUTPUT):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
@@ -356,6 +357,10 @@ def transaction_is_valid(txHashChain, tx):
         elif(sx.type == sectionType.AUTHED_MINTERS):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
+
+            # TODO: If coin_color has been authorized before, then the first
+            # datum in the section should be the signature of an authorized minter
+
             for datum in sx.data:
                 if(not authed_minter_datum_well_formed(dx)):
                     # Fail
@@ -374,6 +379,7 @@ def transaction_is_valid(txHashChain, tx):
                     return false
                 deauthed_minters.add(datum.dx[0])
             seen_bytes += [sx.sx_to_bytes()]
+
         elif(sx.type == sectionType.MINT_OUTPUTS):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
@@ -389,6 +395,7 @@ def transaction_is_valid(txHashChain, tx):
                 if(color not in outputs):
                     mint_outputs.add(color)
                 seen_bytes += [sx.sx_to_bytes()]
+
         elif(sx.type == sectionType.SIG_MINT):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
