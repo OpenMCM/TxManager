@@ -94,6 +94,18 @@ class TXHashChain:
 
         return authorized_colors.difference(deauthorized_colors)
 
+    def txHashChain_print(self):
+        curr_hash = self.most_recent_block
+
+        while curr_hash != bottom_hash:
+            curr_block = self.chain[curr_hash]
+            curr_tx = curr_block[1]
+
+            print("Block Hash: ", byte_array_to_string(curr_hash))
+            curr_tx.tx_print()
+            print("\n")
+
+            curr_hash = curr_block[0]
 
     # Takes a (txhash, section_id, output_index) as argument
     # Returns (owner, color, quantity) or (owner, quantity)

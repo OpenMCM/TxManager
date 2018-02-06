@@ -98,3 +98,5 @@ if(txHC.insert_tx(tx_transfer)):
     print("Successfully inserted transaction!")
 else:
     print("Transaction insertion failed!")
+
+txHC.txHashChain_print()

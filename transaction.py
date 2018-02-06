@@ -50,6 +50,12 @@ def byte_to_st(byte):
         return -1
     return sectionType(byte)
 
+def byte_array_to_string(b):
+    p = ""
+    for x in b:
+        p += ''.join('{:02x}'.format(x))
+    return p
+
 # Pretty sure it'll be faster to check for well-formed-ness on the datum level
 # than to have a seperate function that loops through all sections.
 # Takes a [byteArray], returns a bool
@@ -109,13 +115,19 @@ class Datum:
 
     def dx_print(self):
         p = ""
-        p += "    "
-        for i in self.dx[:len(self.dx) - 1]:
+        p += "        "
+        for x in self.dx[0]:
+            p += ''.join('{:02x}'.format(x))
+        p += ",\n"
+        for i in self.dx[1:len(self.dx) - 1]:
+            p += "            "
             for x in i:
                 p += ''.join('{:02x}'.format(x))
-            p += ", "
-        for x in self.dx[len(self.dx) - 1]:
-            p += ''.join('{:02x}'.format(x))
+            p += ",\n"
+        if(len(self.dx) > 1):
+            p += "            "
+            for x in self.dx[len(self.dx) - 1]:
+                p += ''.join('{:02x}'.format(x))
         print(p)
 
 class Section:
@@ -133,10 +145,10 @@ class Section:
         return st_to_bytes(self.type) + self.data_to_bytes() + bytearray([DATA_END])
 
     def sx_print(self):
-        print(self.type, ": [")
+        print("    ", self.type, ": [")
         for dx in self.data:
             dx.dx_print()
-        print("]")
+        print("    ]")
 
 class Transaction:
     def __init__(self, sxs):
@@ -170,8 +182,11 @@ class Transaction:
         return False
 
     def tx_print(self):
+        txhash = hash_sha_256(self.tx_to_bytes())
+        print("tx:", byte_array_to_string(txhash), "[")
         for sx in self.sections:
             sx.sx_print()
+        print("]")
 
 def bytes_to_tx(txbytes):
     # Returns (int, Datum)
