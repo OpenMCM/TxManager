@@ -9,6 +9,13 @@ alice_vk = gen_pubkey(alice_sk)
 alice_ad = hash_sha_256(alice_vk.to_string())
 alice_adp = hash_sha_256(bytearray(alice_vk.to_string()))
 
+bob_sk = gen_privkey()
+bob_vk = gen_pubkey(bob_sk)
+bob_ad = hash_sha_256(bob_vk.to_string())
+bob_adp = hash_sha_256(bytearray(bob_vk.to_string()))
+
+alice_coin_color = bytearray(b"\xde\xad\xbe\xef" * 8)
+
 print("Alice's addr: ", alice_ad)
 print("Alice's addrp: ", alice_adp, "\n")
 
@@ -47,29 +54,47 @@ else:
     print("Transaction insertion failed!")
 
 # Alice mints 2 AC, sends to herself
-mint_outputs_datum = Datum([bytearray(alice_ad), bytearray(b"\xde\xad\xbe\xef" * 8), bytearray(b"\x00\x02\x00\x00")])
+mint_outputs_datum = Datum([bytearray(alice_ad), alice_coin_color, bytearray(b"\x00\x02\x00\x00")])
 mint_outputs_section = Section(sectionType.MINT_OUTPUTS, [mint_outputs_datum])
-print("Mint outputs hash: ", hash_sha_256(bytes(mint_outputs_section.sx_to_bytes())))
 
 sig_mnt_hash_sha_256 = Datum([hash_sha_256(bytes(mint_outputs_section.sx_to_bytes()))])
 
 
 sig = sign(alice_sk, hash_sha_256(bytes(mint_outputs_section.sx_to_bytes())))
 
-print("Test verifying: ", verify(alice_vk, hash_sha_256(bytes(mint_outputs_section.sx_to_bytes())), sig))
-
-print("Signing: ", sig)
-
 sig_mnt_datum = Datum([alice_vk.to_string(), bytes(sign(alice_sk, hash_sha_256(mint_outputs_section.sx_to_bytes()))), hash_sha_256(tx_auth_alice.tx_to_bytes())])
-#sig_mnt_datum = Datum([bytearray(sig)])
 
-print("Datum: ", sig_mnt_datum.dx_to_bytes())
 sig_mnt_section = Section(sectionType.SIG_MINT, [sig_mnt_hash_sha_256, sig_mnt_datum])
 
-print("Section bytes:\n", sig_mnt_section.sx_to_bytes(), "\n\n")
 tx_mnt_two = Transaction([mint_outputs_section, sig_mnt_section])
+tx_mnt_two_hash = hash_sha_256(tx_mnt_two.tx_to_bytes())
 print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_mnt_two)):
+    print("Successfully inserted transaction!")
+else:
+    print("Transaction insertion failed!")
+
+# Alice sends 1 AC to Bob, 1 AC to herself
+inputs_datum = Datum([tx_mnt_two_hash, bytes([sectionType.MINT_OUTPUTS.value]), b'\x00\x00\x00\x00'])
+inputs_section = Section(sectionType.INPUTS, [inputs_datum])
+
+outputs_datum_alice = Datum([alice_ad, alice_coin_color, bytearray(b"\x00\x01\x00\x00")])
+outputs_datum_bob = Datum([bob_ad, alice_coin_color, bytearray(b"\x00\x01\x00\x00")])
+outputs_section = Section(sectionType.OUTPUTS, [outputs_datum_alice, outputs_datum_bob])
+
+section_bytes = inputs_section.sx_to_bytes() + outputs_section.sx_to_bytes()
+print("Section bytes = ", section_bytes)
+tx_transfer_hash = hash_sha_256(bytes(section_bytes))
+
+sig_transfer = sign(alice_sk, tx_transfer_hash)
+sig_transfer_datum = Datum([alice_vk.to_string(), bytes(sig_transfer)])
+sig_hash_datum = Datum([tx_transfer_hash])
+sig_transfer_section = Section(sectionType.SIGNATURES, [sig_hash_datum, sig_transfer_datum])
+
+tx_transfer = Transaction([inputs_section, outputs_section, sig_transfer_section])
+
+print("Inserting transaction into hash chain...")
+if(txHC.insert_tx(tx_transfer)):
     print("Successfully inserted transaction!")
 else:
     print("Transaction insertion failed!")

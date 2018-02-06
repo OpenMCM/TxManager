@@ -107,6 +107,17 @@ class Datum:
                 running_bytes += bytearray([DATUM_LONG]) + i
         return running_bytes
 
+    def dx_print(self):
+        p = ""
+        p += "    "
+        for i in self.dx[:len(self.dx) - 1]:
+            for x in i:
+                p += ''.join('{:02x}'.format(x))
+            p += ", "
+        for x in self.dx[len(self.dx) - 1]:
+            p += ''.join('{:02x}'.format(x))
+        print(p)
+
 class Section:
     def __init__(self, sx_type, sx_data):
         self.type = sx_type
@@ -120,6 +131,12 @@ class Section:
 
     def sx_to_bytes(self):
         return st_to_bytes(self.type) + self.data_to_bytes() + bytearray([DATA_END])
+
+    def sx_print(self):
+        print(self.type, ": [")
+        for dx in self.data:
+            dx.dx_print()
+        print("]")
 
 class Transaction:
     def __init__(self, sxs):
@@ -146,11 +163,15 @@ class Transaction:
                 return sx
 
     def tx_contains_section(self, sx_type):
-        for sx in sections:
+        for sx in self.sections:
             # Possible error: what if sx_type is invalid?
             if(sx.type == sx_type):
                 return True
         return False
+
+    def tx_print(self):
+        for sx in self.sections:
+            sx.sx_print()
 
 def bytes_to_tx(txbytes):
     # Returns (int, Datum)
@@ -225,10 +246,12 @@ def transaction_is_valid(txHashChain, tx):
     # Preliminary version: Only works with non-wildcard shuffles
 
     # A set of the owners of non-wildcard inputs
-    owners = {}
+    owners = set()
 
     # A mapping of colors to quantity of coins
     inputs = {}
+
+    inputs_owners = set()
 
     # A mapping of colors to quantities. We don't care about recipients because
     # -- well, we don't care about recipients. The point of this is to make
@@ -277,71 +300,75 @@ def transaction_is_valid(txHashChain, tx):
                     # Fail
                     print("Malformed input ", datum)
                     # How do we fail again?
-                quote = txHashChain.find_owner_and_quantity_by_quote(datum)
-                owner = quote[0]
-                color = quote[1]
-                quantity = int(quote[2])
-                if color in inputs.keys:
+                quote = txHashChain.find_owner_and_quantity_by_quote(datum.dx)
+                owner = bytes(quote[0])
+                color = bytes(quote[1])
+                quantity = int.from_bytes(quote[2], byteorder='big', signed=False)
+                if color in inputs.keys():
                     inputs[color] += quantity
+                    inputs_owners.add(owner)
                 else:
                     inputs[color] = quantity
+                    inputs_owners.add(owner)
                 owners.add(owner)
-                seen_bytes += [sx.sx_to_bytes()]
+            seen_bytes += sx.sx_to_bytes()
 
         elif(sx.type == sectionType.OUTPUTS):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
-            if(sectionType.INPUT not in seen_secs):
+            if(sectionType.INPUTS not in seen_secs):
                 # Fail
                 print("Output comes before input! ")
                 # How do we fail again?
             for datum in sx.data:
-                if(not output_datum_well_formed(dx)):
+                if(not output_datum_well_formed(datum)):
                     # Fail
-                    print("Malformed output ", dx)
+                    print("Malformed output ", datum)
                     # How do we fail again?
                 recipient = datum.dx[0]
-                color = datum.dx[1]
-                quantity = int(datum.dx[2])
+                color = int.from_bytes(datum.dx[1], byteorder='big', signed=False)
+                quantity = int.from_bytes(datum.dx[2], byteorder='big', signed=False)
                 if(color in outputs):
                     outputs[color] += quantity
                 else:
                     outputs[color] = quantity
-                seen_bytes += [sx.sx_to_bytes()]
+            seen_bytes += sx.sx_to_bytes()
 
         elif(sx.type == sectionType.SIGNATURES):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
-            if(sectionType.OUTPUT not in seen_secs or sectionType.INPUT not in seen_secs):
+            if(sectionType.OUTPUTS not in seen_secs or sectionType.INPUTS not in seen_secs):
                 # Fail
                 print("Missing outputs or inputs ", sx)
                 return False
+            print("Seen bytes = ", seen_bytes)
             running_hash = hash_sha_256(seen_bytes)
             noted_hash = sx.data[0].dx[0]
 
             if(running_hash != noted_hash):
                 print("Hash mismatch between ", running_hash, " and ", noted_hash)
+                return False
 
-            addresses_signed = {}
+            addresses_signed = set()
 
             for signature in sx.data[1:]:
-                pubkey = signature[0]
-                sig = signature[1]
-                proof = signature[2]
+                pubkey = signature.dx[0]
+                sig = signature.dx[1]
                 addresses_signed.add(hash_sha_256(pubkey))
                 try:
                     vk = gen_pubkey_from_bytes(pubkey)
-                    verify(pubkey, noted_hash, sig)
+                    verify(vk, noted_hash, sig)
                 except:
                     # Signature is invalid! Return False
                     print("Invalid signature: ", signature)
                     return False
 
-            inputs_owners = set(inputs.keys)
+            print("signers: ", addresses_signed)
+            print("owners: ", inputs_owners)
 
             leftover_owners = inputs_owners.difference(addresses_signed)
 
-            if(leftover_owners != {}):
+            if(leftover_owners != set()):
                 print("Not enough signatures to validate signature")
                 return False
 

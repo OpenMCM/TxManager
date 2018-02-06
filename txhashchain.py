@@ -95,21 +95,30 @@ class TXHashChain:
         return authorized_colors.difference(deauthorized_colors)
 
 
-    # Takes a (txhash, output_index) as argument
+    # Takes a (txhash, section_id, output_index) as argument
     # Returns (owner, color, quantity) or (owner, quantity)
     #   - Note: Will only return (owner, quantity) if we allow for black coins!
     def find_owner_and_quantity_by_quote(self, quote):
         txhash = quote[0]
-        output_index = quote[1]
+        print("Finding tx of hash = ", txhash)
+        output_index = int.from_bytes(quote[2], byteorder='big', signed=False)
 
-        tx = find_tx_by_hash(txhash)
+        tx = self.find_tx_by_hash(txhash)
+        print("Found tx: ", tx)
 
+        tx.tx_print()
+
+        print("Finding section of id: ", sectionType(int.from_bytes(quote[1], byteorder='big', signed=False)))
+        sec_type = sectionType(int.from_bytes(quote[1], byteorder='big', signed=False))
+        if(sec_type != sectionType.MINT_OUTPUTS and sec_type != sectionType.OUTPUTS and sec_type != sectionType.PAINT_OUTPUTS):
+            return None
         # Get transaction output section
-        outputs = tx.get_section(sectionType.OUTPUT)
+        outputs = tx.get_section(sectionType(int.from_bytes(quote[1], byteorder='big', signed=False)))
+        print("Found outputs: ", outputs)
 
         # The output is alread organized as a list of (o, c, q), so we can
         # just return the index in the output from here.
-        return outputs[output_index]
+        return outputs.data[output_index].dx
 
     # Iterate through txHashChain and verify that a given nonce has never
     # been used before
