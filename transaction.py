@@ -1,6 +1,7 @@
 from enum import Enum
 
 from Crypto.Hash import SHA256
+from cryptohelpers import *
 import ecdsa
 
 DATUM_BYTE      = 0x01  # Indicator of a 1-byte value in a tuple
@@ -139,7 +140,7 @@ class Transaction:
         return Transaction(new_sections)
 
     def get_section(self, sx_type):
-        for sx in sections:
+        for sx in self.sections:
             # Possible error: what if sx_type is invalid?
             if(sx.type == sx_type):
                 return sx
@@ -235,8 +236,9 @@ def transaction_is_valid(txHashChain, tx):
     outputs = {}
 
     # Same as outputs, but we'll definitely have to seperate newly minted coins
-    # from previously minted ones.
-    mint_outputs = {}
+    # from previously minted ones. We don't keep a count here because we don't
+    # care how many coins an authorized minter is creating.
+    mint_outputs = set()
 
     # A set of sections that we pass by. Note that we don't allow duplicate
     # sections -- being dumb has a direct consequence (i.e. storing txchain) to
@@ -314,7 +316,7 @@ def transaction_is_valid(txHashChain, tx):
                 # Fail
                 print("Missing outputs or inputs ", sx)
                 return False
-            running_hash = SHA256(seen_bytes)
+            running_hash = hash_sha_256(seen_bytes)
             noted_hash = sx.data[0].dx[0]
 
             if(running_hash != noted_hash):
@@ -326,7 +328,7 @@ def transaction_is_valid(txHashChain, tx):
                 pubkey = signature[0]
                 sig = signature[1]
                 proof = signature[2]
-                addresses_signed.add(hash(pubkey))
+                addresses_signed.add(hash_sha_256(pubkey))
                 try:
                     vk = gen_pubkey_from_bytes(pubkey)
                     verify(pubkey, noted_hash, sig)
@@ -378,23 +380,24 @@ def transaction_is_valid(txHashChain, tx):
                     print("Malformed deauthed_minter section ", sx)
                     return False
                 deauthed_minters.add(datum.dx[0])
-            seen_bytes += [sx.sx_to_bytes()]
+            seen_bytes += sx.sx_to_bytes()
 
         elif(sx.type == sectionType.MINT_OUTPUTS):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
             # This section has the same structure as output!
             for datum in sx.data:
-                if(not output_datum_well_formed(dx)):
+                if(not output_datum_well_formed(datum)):
                     # Fail
-                    print("Malformed output ", dx)
+                    print("Malformed output ", datum)
                     # How do we fail again?
                 recipient = datum.dx[0]
-                color = datum.dx[1]
-                quantity = int(datum.dx[2])
-                if(color not in outputs):
+                color = bytes(datum.dx[1])
+                #quantity = int(datum.dx[2])
+                quantity = int.from_bytes(datum.dx[2], byteorder='big', signed=False)
+                if(color not in mint_outputs):
                     mint_outputs.add(color)
-                seen_bytes += [sx.sx_to_bytes()]
+                seen_bytes += sx.sx_to_bytes()
 
         elif(sx.type == sectionType.SIG_MINT):
             check_section_duplicate(seen_secs, sx.type)
@@ -407,25 +410,28 @@ def transaction_is_valid(txHashChain, tx):
             #   - Find all coins that signer is authed for
             # Take union of all sets of mintable coins
             # Assert that {coins being minted} - {mintable coins} = {}
-            running_hash = SHA256(seen_bytes)
+
+            running_hash = hash_sha_256(bytes(seen_bytes))
             noted_hash = sx.data[0].dx[0]
 
-            colors_authorized_to_mint = {}
+            colors_authorized_to_mint = set()
 
             if(running_hash != noted_hash):
                 print("Hash mismatch between ", running_hash, " and ", noted_hash)
+                return False
 
             # Signatures of mints are structured as
             # (pubkey, signature, txhash(proof of authorization))
             for signature in sx.data[1:]:
-                pubkey = signature[0]
-                sig = signature[1]
-                proof = signature[2]
+                pubkey = signature.dx[0]
+                sig = signature.dx[1]
+                proof = signature.dx[2]
                 try:
                     vk = gen_pubkey_from_bytes(pubkey)
-                    verify(pubkey, noted_hash, sig)
-                except:
+                    verify(vk, noted_hash, sig)
+                except Exception as e:
                     # Signature is invalid! Return False
+                    print("\n\n", e, "\n\n")
                     print("Invalid signature: ", signature)
                     return False
                 # If we got here, then the signature is valid! Now we need to
@@ -436,18 +442,20 @@ def transaction_is_valid(txHashChain, tx):
                     print("Nonexistent proof-of-authorization", proof)
                     return False
 
-                pubkeyhash = hash(pubkey)
+                pubkeyhash = hash_sha_256(pubkey)
 
                 authed_colors = txHashChain.get_authed_color(pubkeyhash, proof)
 
-                colors_authorized_to_mint.union(authed_colors)
+                colors_authorized_to_mint = colors_authorized_to_mint.union(authed_colors)
 
             leftover_minted = mint_outputs.difference(colors_authorized_to_mint)
 
-            if(leftover_minted != {}):
+            # If we're only minting colors that we're authed to mint,
+            # then leftover_minted will be an empty set.
+            if(leftover_minted != set()):
                 print("Colors being minted without an authorized signature")
                 return False
-    return True        
+    return True
 
 
 

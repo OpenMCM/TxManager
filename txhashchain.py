@@ -15,7 +15,7 @@ class TXHashChain:
         # Gotta make a genesis block with arbitrary prevHash and transaction
         bottom_tx = Transaction([])
 
-        bottom_block_hash = hash(bottom_hash + bottom_tx.tx_to_bytes())
+        bottom_block_hash = hash_sha_256(bottom_hash + bottom_tx.tx_to_bytes())
 
         self.most_recent_block = bottom_block_hash
         self.chain = {bottom_block_hash:(bottom_hash, bottom_tx)}
@@ -34,7 +34,7 @@ class TXHashChain:
         new_block = (self.most_recent_block, tx)
 
         # Calc new block hash
-        new_block_hash = hash(new_block[0] + new_block[1].tx_to_bytes())
+        new_block_hash = hash_sha_256(new_block[0] + new_block[1].tx_to_bytes())
 
         # Insert the new block into the chain
         self.chain[new_block_hash] = new_block
@@ -49,7 +49,7 @@ class TXHashChain:
         while curr_hash != bottom_hash:
             curr_block = self.chain[curr_hash]
             curr_tx = curr_block[1]
-            curr_tx_hash = hash(curr_tx.tx_to_bytes())
+            curr_tx_hash = hash_sha_256(curr_tx.tx_to_bytes())
             if(curr_tx_hash == txhash):
                 return curr_tx
             else:
@@ -63,33 +63,34 @@ class TXHashChain:
     def get_authed_color(self, pubkeyhash, txhash):
         curr_hash = self.most_recent_block
 
-        authorized_colors = {}
-        deauthorized_colors = {}
+        authorized_colors = set()
+        deauthorized_colors = set()
 
         while curr_hash != bottom_hash:
             curr_block = self.chain[curr_hash]
             curr_tx = curr_block[1]
-            curr_tx_hash = hash(curr_tx.tx_to_bytes())
+            curr_tx_hash = hash_sha_256(curr_tx.tx_to_bytes())
             if(curr_tx_hash == txhash):
-                color_section = curr_tx.get_section(sx.COINCOLOR)
+                print("Found tx!!!")
+                color_section = curr_tx.get_section(sectionType.COINCOLOR)
                 color = color_section.data[0].dx[0]
-                auth_section = curr_tx.get_section(sx.AUTHED_MINTERS)
+                auth_section = curr_tx.get_section(sectionType.AUTHED_MINTERS)
                 if(auth_section == None):
                     print("Error: transaction", txhash, "Does not authorize any minters")
                     return None
                 for minter in auth_section.data:
                     if minter.dx[0] == pubkeyhash:
-                        authorized_colors.add(color)
+                        authorized_colors.add(bytes(color))
             else:
-                deauth_section = curr_tx.get_section(sx.DEAUTHED_MINTERS)
+                deauth_section = curr_tx.get_section(sectionType.DEAUTHED_MINTERS)
                 if(deauth_section != None):
-                    color_section = curr_tx.get_section(sx.COINCOLOR)
+                    color_section = curr_tx.get_section(sectionType.COINCOLOR)
                     color = color_section.data[0].dx[0]
                     for minter in deauth_section.data:
                         if minter.dx[0] == pubkeyhash:
                             deauthorized_colors.add(color)
 
-                curr_hash = curr_block[0]
+            curr_hash = curr_block[0]
 
         return authorized_colors.difference(deauthorized_colors)
 

@@ -2,17 +2,17 @@ from Crypto.Hash import SHA256
 from ecdsa import SigningKey, NIST256p, VerifyingKey
 
 # Take in bytes, output SHA256(bytes)
-def hash(bytes):
+def hash_sha_256(b):
     h = SHA256.new()
-    h.update(bytes)
+    h.update(b)
     return h.digest()
 
 def gen_privkey():
     sk = SigningKey.generate(curve=NIST256p)
     return sk
 
-def gen_pubkey_from_bytes(bytes):
-    vk = VerifyingKey.from_string(bytes, curve=NIST256p)
+def gen_pubkey_from_bytes(b):
+    vk = VerifyingKey.from_string(b, curve=NIST256p)
     return vk
 
 def gen_pubkey(privkey):
@@ -21,8 +21,8 @@ def gen_pubkey(privkey):
 def sign(privkey, message):
     return privkey.sign(message)
 
-def verify(pubkey, hash, sig):
-    return pubkey.verify(sig, hash)
+def verify(pubkey, h, sig):
+    return pubkey.verify(sig, h)
 
 """
 message = hash(b"message")
