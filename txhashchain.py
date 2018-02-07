@@ -107,6 +107,39 @@ class TXHashChain:
             curr_hash = curr_block[0]
 
     # Takes a (txhash, section_id, output_index) as argument
+    # Returns a bool denoting whether the given quote has been referenced
+    # in an input before
+    def quote_is_unspent(self, quote):
+        curr_hash = self.most_recent_block
+
+        while curr_hash != bottom_hash:
+            curr_block = self.chain[curr_hash]
+            curr_tx = curr_block[1]
+
+            inputs_section = curr_tx.get_section(sectionType.INPUTS)
+            if(inputs_section != None):
+                for q in inputs_section.data:
+                    txhash = quote[0]
+                    output_index = int.from_bytes(quote[2], byteorder='big', signed=False)
+                    sec_type = sectionType(int.from_bytes(quote[1], byteorder='big', signed=False))
+                    if((txhash, sec_type, output_index) == quote):
+                        return False
+
+            inputs_section = curr_tx.get_section(sectionType.PAINT_INPUTS)
+            if(inputs_section != None):
+                for q in inputs_section.data:
+                    txhash = quote[0]
+                    output_index = int.from_bytes(quote[2], byteorder='big', signed=False)
+                    sec_type = sectionType(int.from_bytes(quote[1], byteorder='big', signed=False))
+                    if((txhash, sec_type, output_index) == quote):
+                        return False
+
+            if(hash_sha_256(curr_tx.tx_to_bytes()) == quote[0]):
+                return True
+
+            curr_hash = curr_block[0]
+
+    # Takes a (txhash, section_id, output_index) as argument
     # Returns (owner, color, quantity) or (owner, quantity)
     #   - Note: Will only return (owner, quantity) if we allow for black coins!
     def find_owner_and_quantity_by_quote(self, quote):

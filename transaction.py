@@ -93,7 +93,6 @@ def deauthed_minter_datum_well_formed(datum):
         return True
 
 # A datum is an n-element list of 32-byte values.
-# TODO: Allow data of less than 32 bytes
 class Datum:
     def __init__(self, dx):
         self.dx = dx
@@ -112,6 +111,12 @@ class Datum:
             elif(len(i) == 64):
                 running_bytes += bytearray([DATUM_LONG]) + i
         return running_bytes
+
+    def datum_to_quote(self):
+        if(len(self.dx) != 3 or len(self.dx[0]) != 32 or len(self.dx[2]) != 4):
+            return None
+        return (self.dx[0], self.dx[1], self.dx[2])
+
 
     def dx_print(self):
         p = ""
@@ -173,6 +178,7 @@ class Transaction:
             # Possible error: what if sx_type is invalid?
             if(sx.type == sx_type):
                 return sx
+        return None
 
     def tx_contains_section(self, sx_type):
         for sx in self.sections:
@@ -314,6 +320,9 @@ def transaction_is_valid(txHashChain, tx):
                 if(not input_datum_well_formed(datum)):
                     # Fail
                     print("Malformed input ", datum)
+                    return False
+                if(not txHashChain.quote_is_unspent(datum.dx)):
+                    print("Error: input", datum.dx, " has already been spent")
                     return False
                 quote = txHashChain.find_owner_and_quantity_by_quote(datum.dx)
                 owner = bytes(quote[0])
