@@ -61,7 +61,7 @@ def byte_array_to_string(b):
 # Takes a [byteArray], returns a bool
 # Transaction quotes (i.e. inputs) have the form (txhash, output_index)
 def input_datum_well_formed(datum):
-    if(len(datum.dx) != 2 or len(datum.dx[0]) != 64 or len(datum.dx[1]) != 4):
+    if(len(datum.dx) != 3 or len(datum.dx[0]) != 32 or len(datum.dx[2]) != 4):
         return False
     else:
         return True
@@ -145,7 +145,7 @@ class Section:
         return st_to_bytes(self.type) + self.data_to_bytes() + bytearray([DATA_END])
 
     def sx_print(self):
-        print("    ", self.type, ": [")
+        print("    ", self.type, "[")
         for dx in self.data:
             dx.dx_print()
         print("    ]")
@@ -314,7 +314,7 @@ def transaction_is_valid(txHashChain, tx):
                 if(not input_datum_well_formed(datum)):
                     # Fail
                     print("Malformed input ", datum)
-                    # How do we fail again?
+                    return False
                 quote = txHashChain.find_owner_and_quantity_by_quote(datum.dx)
                 owner = bytes(quote[0])
                 color = bytes(quote[1])
@@ -334,12 +334,12 @@ def transaction_is_valid(txHashChain, tx):
             if(sectionType.INPUTS not in seen_secs):
                 # Fail
                 print("Output comes before input! ")
-                # How do we fail again?
+                return False
             for datum in sx.data:
                 if(not output_datum_well_formed(datum)):
                     # Fail
                     print("Malformed output ", datum)
-                    # How do we fail again?
+                    return False
                 recipient = datum.dx[0]
                 color = int.from_bytes(datum.dx[1], byteorder='big', signed=False)
                 quantity = int.from_bytes(datum.dx[2], byteorder='big', signed=False)
@@ -356,7 +356,7 @@ def transaction_is_valid(txHashChain, tx):
                 # Fail
                 print("Missing outputs or inputs ", sx)
                 return False
-            print("Seen bytes = ", seen_bytes)
+
             running_hash = hash_sha_256(seen_bytes)
             noted_hash = sx.data[0].dx[0]
 
@@ -377,9 +377,6 @@ def transaction_is_valid(txHashChain, tx):
                     # Signature is invalid! Return False
                     print("Invalid signature: ", signature)
                     return False
-
-            print("signers: ", addresses_signed)
-            print("owners: ", inputs_owners)
 
             leftover_owners = inputs_owners.difference(addresses_signed)
 

@@ -49,9 +49,9 @@ print("Final transaction bytes: \n", tx_auth_alice.tx_to_bytes(), "\n\n")
 
 print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_auth_alice)):
-    print("Successfully inserted transaction!")
+    print("Success -- transaction accepted")
 else:
-    print("Transaction insertion failed!")
+    print("Failure -- transaction rejected")
 
 # Alice mints 2 AC, sends to herself
 mint_outputs_datum = Datum([bytearray(alice_ad), alice_coin_color, bytearray(b"\x00\x02\x00\x00")])
@@ -70,9 +70,9 @@ tx_mnt_two = Transaction([mint_outputs_section, sig_mnt_section])
 tx_mnt_two_hash = hash_sha_256(tx_mnt_two.tx_to_bytes())
 print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_mnt_two)):
-    print("Successfully inserted transaction!")
+    print("Success -- transaction accepted")
 else:
-    print("Transaction insertion failed!")
+    print("Failure -- transaction rejected")
 
 # Alice sends 1 AC to Bob, 1 AC to herself
 inputs_datum = Datum([tx_mnt_two_hash, bytes([sectionType.MINT_OUTPUTS.value]), b'\x00\x00\x00\x00'])
@@ -83,7 +83,7 @@ outputs_datum_bob = Datum([bob_ad, alice_coin_color, bytearray(b"\x00\x01\x00\x0
 outputs_section = Section(sectionType.OUTPUTS, [outputs_datum_alice, outputs_datum_bob])
 
 section_bytes = inputs_section.sx_to_bytes() + outputs_section.sx_to_bytes()
-print("Section bytes = ", section_bytes)
+
 tx_transfer_hash = hash_sha_256(bytes(section_bytes))
 
 sig_transfer = sign(alice_sk, tx_transfer_hash)
@@ -95,8 +95,8 @@ tx_transfer = Transaction([inputs_section, outputs_section, sig_transfer_section
 
 print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_transfer)):
-    print("Successfully inserted transaction!")
+    print("Success -- transaction accepted")
 else:
-    print("Transaction insertion failed!")
+    print("Failure -- transaction rejected")
 
 txHC.txHashChain_print()

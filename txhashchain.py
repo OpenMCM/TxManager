@@ -71,7 +71,6 @@ class TXHashChain:
             curr_tx = curr_block[1]
             curr_tx_hash = hash_sha_256(curr_tx.tx_to_bytes())
             if(curr_tx_hash == txhash):
-                print("Found tx!!!")
                 color_section = curr_tx.get_section(sectionType.COINCOLOR)
                 color = color_section.data[0].dx[0]
                 auth_section = curr_tx.get_section(sectionType.AUTHED_MINTERS)
@@ -112,21 +111,15 @@ class TXHashChain:
     #   - Note: Will only return (owner, quantity) if we allow for black coins!
     def find_owner_and_quantity_by_quote(self, quote):
         txhash = quote[0]
-        print("Finding tx of hash = ", txhash)
         output_index = int.from_bytes(quote[2], byteorder='big', signed=False)
 
         tx = self.find_tx_by_hash(txhash)
-        print("Found tx: ", tx)
 
-        tx.tx_print()
-
-        print("Finding section of id: ", sectionType(int.from_bytes(quote[1], byteorder='big', signed=False)))
         sec_type = sectionType(int.from_bytes(quote[1], byteorder='big', signed=False))
         if(sec_type != sectionType.MINT_OUTPUTS and sec_type != sectionType.OUTPUTS and sec_type != sectionType.PAINT_OUTPUTS):
             return None
         # Get transaction output section
-        outputs = tx.get_section(sectionType(int.from_bytes(quote[1], byteorder='big', signed=False)))
-        print("Found outputs: ", outputs)
+        outputs = tx.get_section(sec_type)
 
         # The output is alread organized as a list of (o, c, q), so we can
         # just return the index in the output from here.
