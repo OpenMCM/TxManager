@@ -92,11 +92,36 @@ sig_hash_datum = Datum([tx_transfer_hash])
 sig_transfer_section = Section(sectionType.SIGNATURES, [sig_hash_datum, sig_transfer_datum])
 
 tx_transfer = Transaction([inputs_section, outputs_section, sig_transfer_section])
+tx_transfer_hash = hash_sha_256(bytes(tx_transfer.tx_to_bytes()))
 
 print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_transfer)):
     print("Success -- transaction accepted")
 else:
     print("Failure -- transaction rejected")
+
+inputs_transfer_two = Datum([tx_transfer_hash, bytes([sectionType.OUTPUTS.value]), bytearray(b"\x00\x00\x00\x01")])
+inputs_section_two = Section(sectionType.INPUTS, [inputs_transfer_two])
+
+outputs_transfer_two = Datum([alice_ad, alice_coin_color, bytearray(b"\x00\x01\x00\x00")])
+outputs_section_two = Section(sectionType.OUTPUTS, [outputs_transfer_two])
+
+section_bytes_two = inputs_section_two.sx_to_bytes() + outputs_section_two.sx_to_bytes()
+tx_transfer_two_hash = hash_sha_256(section_bytes_two)
+
+sig_transfer_two = sign(bob_sk, tx_transfer_two_hash)
+sig_transfer_two_datum = Datum([bob_vk.to_string(), bytes(sig_transfer_two)])
+sig_hash_two_datum = Datum([tx_transfer_two_hash])
+sig_transfer_two_section = Section(sectionType.SIGNATURES, [sig_hash_two_datum, sig_transfer_two_datum])
+
+tx_transfer_two = Transaction([inputs_section_two, outputs_section_two, sig_transfer_two_section])
+tx_transfer_two_hash = hash_sha_256(bytes(tx_transfer_two.tx_to_bytes()))
+
+print("Inserting transaction into hash chain...")
+if(txHC.insert_tx(tx_transfer_two)):
+    print("Success -- transaction accepted")
+else:
+    print("Failure -- transaction rejected")
+
 
 txHC.txHashChain_print()
