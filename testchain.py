@@ -16,16 +16,11 @@ bob_adp = hash_sha_256(bytearray(bob_vk.to_string()))
 
 alice_coin_color = bytearray(b"\xde\xad\xbe\xef" * 8)
 
+print("Alice's pubkey: ", alice_vk.to_string())
 print("Alice's addr: ", alice_ad)
-print("Alice's addrp: ", alice_adp, "\n")
 
 print("Bob's pubkey: ", bob_vk.to_string())
 print("Bob's address: ", bob_ad)
-
-
-print("Just making sure we can convert pubkeys to and from bytes")
-print("Alice's pubkey: ", alice_vk.to_string())
-print("Alice's telephone-d pubkey: ", gen_pubkey_from_bytes(bytearray(alice_vk.to_string())).to_string())
 
 # Alice authorizes herself to mint AliceCoin
 # This transaction takes the form:
@@ -51,7 +46,7 @@ tx_auth_alice = Transaction([color_section, authed_section])
 tx_auth_alice_hash = hash_sha_256(tx_auth_alice.tx_to_bytes())
 print("Final transaction bytes: \n", tx_auth_alice.tx_to_bytes(), "\n\n")
 
-print("Inserting transaction into hash chain...")
+
 if(txHC.insert_tx(tx_auth_alice)):
     print("Success -- transaction accepted")
 else:
@@ -72,7 +67,7 @@ sig_mnt_section = Section(sectionType.SIG_MINT, [sig_mnt_hash_sha_256, sig_mnt_d
 
 tx_mnt_two = Transaction([mint_outputs_section, sig_mnt_section])
 tx_mnt_two_hash = hash_sha_256(tx_mnt_two.tx_to_bytes())
-print("Inserting transaction into hash chain...")
+
 if(txHC.insert_tx(tx_mnt_two)):
     print("Success -- transaction accepted")
 else:
@@ -98,7 +93,6 @@ sig_transfer_section = Section(sectionType.SIGNATURES, [sig_hash_datum, sig_tran
 tx_transfer = Transaction([inputs_section, outputs_section, sig_transfer_section])
 tx_transfer_hash = hash_sha_256(bytes(tx_transfer.tx_to_bytes()))
 
-print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_transfer)):
     print("Success -- transaction accepted")
 else:
@@ -122,7 +116,6 @@ sig_transfer_two_section = Section(sectionType.SIGNATURES, [sig_hash_two_datum, 
 tx_transfer_two = Transaction([inputs_section_two, outputs_section_two, sig_transfer_two_section])
 tx_transfer_two_hash = hash_sha_256(bytes(tx_transfer_two.tx_to_bytes()))
 
-print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_transfer_two)):
     print("Success -- transaction accepted")
 else:
@@ -146,7 +139,6 @@ sig_transfer_two_section = Section(sectionType.SIGNATURES, [sig_hash_two_datum, 
 tx_transfer_two = Transaction([inputs_section_two, outputs_section_two, sig_transfer_two_section])
 tx_transfer_two_hash = hash_sha_256(bytes(tx_transfer_two.tx_to_bytes()))
 
-print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_transfer_two)):
     print("Failure -- transaction accepted")
 else:
@@ -171,7 +163,6 @@ sig_transfer_three_section = Section(sectionType.SIGNATURES, [sig_hash_three_dat
 tx_transfer_three = Transaction([inputs_section_three, outputs_section_three, sig_transfer_three_section])
 tx_transfer_three_hash = hash_sha_256(bytes(tx_transfer_three.tx_to_bytes()))
 
-print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_transfer_three)):
     print("Failure -- transaction accepted")
 else:
@@ -187,7 +178,6 @@ authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum])
 
 tx_auth_bob = Transaction([color_section, authed_section])
 
-print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_auth_bob)):
     print("Failure -- transaction accepted")
 else:
@@ -208,7 +198,6 @@ authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum, alice_auth_b
 tx_auth_bob_forreal = Transaction([color_section, authed_section])
 tx_auth_bob_forreal_hash = hash_sha_256(tx_auth_bob_forreal.tx_to_bytes())
 
-print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_auth_bob_forreal)):
     print("Success -- transaction accepted")
 else:
@@ -229,7 +218,7 @@ sig_mnt_section = Section(sectionType.SIG_MINT, [sig_mnt_hash_sha_256, sig_mnt_d
 
 tx_mnt_two = Transaction([mint_outputs_section, sig_mnt_section])
 tx_mnt_two_hash = hash_sha_256(tx_mnt_two.tx_to_bytes())
-print("Inserting transaction into hash chain...")
+
 if(txHC.insert_tx(tx_mnt_two)):
     print("Success -- transaction accepted")
 else:
@@ -250,8 +239,28 @@ deauthed_section = Section(sectionType.DEAUTHED_MINTERS, [deauthed_datum, bob_de
 
 tx_bob_deauth_bob = Transaction([color_section, deauthed_section])
 
-print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_bob_deauth_bob)):
     print("Success -- transaction accepted")
 else:
     print("Failure -- transaction rejected")
+
+# Bob mints 2 AC, sends to self
+mint_outputs_datum = Datum([bytearray(bob_ad), alice_coin_color, bytearray(b"\x00\x02\x00\x00")])
+mint_outputs_section = Section(sectionType.MINT_OUTPUTS, [mint_outputs_datum])
+
+sig_mnt_hash_sha_256 = Datum([hash_sha_256(bytes(mint_outputs_section.sx_to_bytes()))])
+
+
+sig = sign(alice_sk, hash_sha_256(bytes(mint_outputs_section.sx_to_bytes())))
+
+sig_mnt_datum = Datum([bob_vk.to_string(), bytes(sign(bob_sk, hash_sha_256(mint_outputs_section.sx_to_bytes()))), hash_sha_256(tx_auth_bob_forreal.tx_to_bytes())])
+
+sig_mnt_section = Section(sectionType.SIG_MINT, [sig_mnt_hash_sha_256, sig_mnt_datum])
+
+tx_mnt_two = Transaction([mint_outputs_section, sig_mnt_section])
+tx_mnt_two_hash = hash_sha_256(tx_mnt_two.tx_to_bytes())
+
+if(txHC.insert_tx(tx_mnt_two)):
+    print("Failure -- transaction accepted")
+else:
+    print("Success -- transaction rejected")

@@ -105,7 +105,7 @@ class TXHashChain:
                     color = color_section.data[0].dx[0]
                     for minter in deauth_section.data:
                         if minter.dx[0] == pubkeyhash:
-                            deauthorized_colors.add(color)
+                            deauthorized_colors.add(bytes(color))
 
             curr_hash = curr_block[0]
 
