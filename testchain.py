@@ -19,6 +19,9 @@ alice_coin_color = bytearray(b"\xde\xad\xbe\xef" * 8)
 print("Alice's addr: ", alice_ad)
 print("Alice's addrp: ", alice_adp, "\n")
 
+print("Bob's pubkey: ", bob_vk.to_string())
+print("Bob's address: ", bob_ad)
+
 
 print("Just making sure we can convert pubkeys to and from bytes")
 print("Alice's pubkey: ", alice_vk.to_string())
@@ -203,6 +206,7 @@ alice_auth_bob_sig_datum = Datum([alice_vk.to_string(), alice_auth_bob_sig, tx_a
 authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum, alice_auth_bob_sig_datum])
 
 tx_auth_bob_forreal = Transaction([color_section, authed_section])
+tx_auth_bob_forreal_hash = hash_sha_256(tx_auth_bob_forreal.tx_to_bytes())
 
 print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_auth_bob_forreal)):
@@ -227,6 +231,27 @@ tx_mnt_two = Transaction([mint_outputs_section, sig_mnt_section])
 tx_mnt_two_hash = hash_sha_256(tx_mnt_two.tx_to_bytes())
 print("Inserting transaction into hash chain...")
 if(txHC.insert_tx(tx_mnt_two)):
+    print("Success -- transaction accepted")
+else:
+    print("Failure -- transaction rejected")
+
+
+# Bob deauthorizes himself to mint AliceCoin
+color_datum = Datum([bytearray(b"\xde\xad\xbe\xef" * 8)])
+color_section = Section(sectionType.COINCOLOR, [color_datum])
+
+deauthed_datum = Datum([bytearray(bob_ad)])
+
+bob_addr_hash = hash_sha_256(bytes(bob_ad + b"\n"))
+bob_deauth_bob_sig = sign(bob_sk, bob_addr_hash)
+bob_deauth_bob_sig_datum = Datum([bob_vk.to_string(), bob_deauth_bob_sig, tx_auth_bob_forreal_hash])
+
+deauthed_section = Section(sectionType.DEAUTHED_MINTERS, [deauthed_datum, bob_deauth_bob_sig_datum])
+
+tx_bob_deauth_bob = Transaction([color_section, deauthed_section])
+
+print("Inserting transaction into hash chain...")
+if(txHC.insert_tx(tx_bob_deauth_bob)):
     print("Success -- transaction accepted")
 else:
     print("Failure -- transaction rejected")
