@@ -57,6 +57,24 @@ class TXHashChain:
 
         return None
 
+    # Returns a txhash where the color is authorized to be minted if one exists,
+    # and None otherwise.
+    def color_has_been_authorized(self, color):
+        curr_hash = self.most_recent_block
+
+        while curr_hash != bottom_hash:
+            curr_block = self.chain[curr_hash]
+            curr_tx = curr_block[1]
+            curr_tx_hash = hash_sha_256(curr_tx.tx_to_bytes())
+
+            coin_color_section = curr_tx.get_section(sectionType.COINCOLOR)
+            if(coin_color_section != None):
+                if(coin_color_section.data[0].dx[0] == color):
+                    return curr_tx_hash
+
+            curr_hash = curr_block[0]
+        return None
+
     # Verifies that pubkeyhash is an authorized minter of the color specified
     # at txhash. Also verifies that pubkeyhash has not been deauthorized since
     # txhash was issued. Returns a set of colors.
@@ -119,19 +137,13 @@ class TXHashChain:
             inputs_section = curr_tx.get_section(sectionType.INPUTS)
             if(inputs_section != None):
                 for q in inputs_section.data:
-                    txhash = quote[0]
-                    output_index = int.from_bytes(quote[2], byteorder='big', signed=False)
-                    sec_type = sectionType(int.from_bytes(quote[1], byteorder='big', signed=False))
-                    if((txhash, sec_type, output_index) == quote):
+                    if(q.dx == quote):
                         return False
 
             inputs_section = curr_tx.get_section(sectionType.PAINT_INPUTS)
             if(inputs_section != None):
                 for q in inputs_section.data:
-                    txhash = quote[0]
-                    output_index = int.from_bytes(quote[2], byteorder='big', signed=False)
-                    sec_type = sectionType(int.from_bytes(quote[1], byteorder='big', signed=False))
-                    if((txhash, sec_type, output_index) == quote):
+                    if(q.dx == quote):
                         return False
 
             if(hash_sha_256(curr_tx.tx_to_bytes()) == quote[0]):
@@ -162,38 +174,3 @@ class TXHashChain:
     # been used before
     def nonce_unused(self, nonce):
         print("Placeholder")
-
-"""
-d = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
-s = Section(sectionType.BURN, [d])
-t = Transaction([s])
-
-
-print(t.tx_to_bytes())
-print(bytes_to_tx(t.tx_to_bytes()).tx_to_bytes())
-print(t)
-
-print("\n\n", byte_to_st(0x01))
-
-
-d1 = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
-s1 = Section(sectionType.PAINT_INPUTS, [d])
-d2 = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
-s2 = Section(sectionType.PAINT_OUTPUTS, [d])
-t2 = Transaction([s1, s2])
-
-
-print(t2.tx_to_bytes())
-print(bytes_to_tx(t2.tx_to_bytes()).tx_to_bytes())
-print(t)
-
-print(t2.strip_section(sectionType.PAINT_INPUTS).tx_to_bytes())
-
-print("\n\n", byte_to_st(0x01))
-
-thc = TXHashChain()
-
-thc.insert_tx(t)
-thc.insert_tx(t2)
-print(thc.find_tx_by_hash(hash(t2.tx_to_bytes())).tx_to_bytes())
-"""

@@ -410,14 +410,65 @@ def transaction_is_valid(txHashChain, tx):
 
             # TODO: If coin_color has been authorized before, then the first
             # datum in the section should be the signature of an authorized minter
+            auth_tx = txHashChain.color_has_been_authorized(coin_color)
 
-            for datum in sx.data:
-                if(not authed_minter_datum_well_formed(datum)):
-                    # Fail
-                    print("Malformed authed_minter section ", sx)
+            if(auth_tx != None):
+                seen_auths = bytearray([])
+                for datum in sx.data[:len(sx.data) - 1]:
+                    if(not authed_minter_datum_well_formed(datum)):
+                        # Fail
+                        print("Malformed authed_minter section ", sx)
+                        return False
+                    authed_minters.add(bytes(datum.dx[0]))
+                    seen_auths += datum.dx[0] + b"\n"
+                # The color has been authorized before! We need to verify
+                # The signature in the last datum
+                sig_datum = sx.data[len(sx.data) - 1]
+
+                try:
+                    pubkey = sig_datum.dx[0]
+                    sig = sig_datum.dx[1]
+                    proof = sig_datum.dx[2]
+
+                    h = hash_sha_256(bytes(seen_auths))
+
+                    vk = gen_pubkey_from_bytes(pubkey)
+                    verify(vk, h, sig)
+                except Exception as e:
+                    # Signature is invalid! Return False
+                    print("Invalid signature: ", sig_datum.dx)
                     return False
-                authed_minters.add(bytes(datum.dx[0]))
-            seen_bytes += sx.sx_to_bytes()
+                # If we got here, then the signature is valid! Now we need to
+                # get all of the colors that this signature is authorized for:
+                proof_transaction = txHashChain.find_tx_by_hash(proof)
+                if(proof_transaction == None):
+                    # Oh noes! The transaction they quoted doesn't exist!
+                    print("Nonexistent proof-of-authorization", proof)
+                    return False
+
+                pubkeyhash = hash_sha_256(pubkey)
+
+                authed_colors = txHashChain.get_authed_color(pubkeyhash, proof)
+
+                if(coin_color == None):
+                    print("Error: coin color not found")
+                    return False
+
+                if(bytes(coin_color) not in authed_colors):
+                    print("Error: unauthorized minter's signature")
+                    return False
+
+                seen_bytes += sx.sx_to_bytes()
+            else:
+                # The color has not been authorized before, and we can proceed
+                # as normal
+                for datum in sx.data:
+                    if(not authed_minter_datum_well_formed(datum)):
+                        # Fail
+                        print("Malformed authed_minter section ", sx)
+                        return False
+                    authed_minters.add(bytes(datum.dx[0]))
+                seen_bytes += sx.sx_to_bytes()
 
         elif(sx.type == sectionType.DEAUTHED_MINTERS):
             check_section_duplicate(seen_secs, sx.type)
