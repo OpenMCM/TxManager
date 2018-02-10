@@ -61,6 +61,7 @@ authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum])
 print("Constructing transaction...")
 tx_auth_alice = Transaction([color_section, authed_section])
 tx_auth_alice_hash = hash_sha_256(tx_auth_alice.tx_to_bytes())
+first_tx_hash = tx_auth_alice_hash
 print("Final transaction bytes: \n", tx_auth_alice.tx_to_bytes(), "\n\n")
 
 
@@ -390,6 +391,55 @@ sx_hash = hash_sha_256(bytes(in_out_bytes))
 tx = Transaction([inputs_section, outputs_section])
 
 if(txHC.insert_tx(tx)):
+    print("Failure -- transaction accepted")
+else:
+    print("Success -- transaction rejected")
+
+# Mallory tries to mint AliceCoin out of thin air, quoting no inputs
+inputs_datum = Datum([])
+inputs_section = Section(sectionType.INPUTS, [inputs_datum])
+
+outputs_datum = Datum([mallory_ad, alice_coin_color, b"\x00\x01\x00\x00"])
+outputs_section = Section(sectionType.OUTPUTS, [outputs_datum])
+
+in_out_bytes = inputs_section.sx_to_bytes() + outputs_section.sx_to_bytes()
+sx_hash = hash_sha_256(bytes(in_out_bytes))
+
+sec_hash_datum = Datum([sx_hash])
+sig_datum = Datum([mallory_vk.to_string(), sign(mallory_sk, sx_hash)])
+sig_section = Section(sectionType.SIGNATURES, [sec_hash_datum, sig_datum])
+
+tx = Transaction([inputs_section, outputs_section, sig_section])
+
+if(txHC.insert_tx(tx)):
+    print("Failure -- transaction accepted")
+else:
+    print("Success -- transaction rejected")
+
+# Mallory authorizes himself to mint AliceCoinPrime with his own signature
+color_datum = Datum([alice_coin_prime_color])
+color_section = Section(sectionType.COINCOLOR, [color_datum])
+sig_datum = Datum([mallory_vk.to_string(), sign(mallory_sk, hash_sha_256(bytes(mallory_ad + b"\n"))), first_tx_hash])
+authed_datum = Datum([bytearray(mallory_ad)])
+authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum, sig_datum])
+tx_auth_mallory = Transaction([color_section, authed_section])
+tx_auth_mallory_hash = hash_sha_256(tx_auth_mallory.tx_to_bytes())
+
+if(txHC.insert_tx(tx_auth_mallory)):
+    print("Failure -- transaction accepted")
+else:
+    print("Success -- transaction rejected")
+
+# Mallory authorizes himself to mint AliceCoinPrime with no signature
+color_datum = Datum([alice_coin_prime_color])
+color_section = Section(sectionType.COINCOLOR, [color_datum])
+authed_datum = Datum([bytearray(mallory_ad)])
+authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum])
+tx_auth_mallory = Transaction([color_section, authed_section])
+tx_auth_mallory_hash = hash_sha_256(tx_auth_mallory.tx_to_bytes())
+
+
+if(txHC.insert_tx(tx_auth_mallory)):
     print("Failure -- transaction accepted")
 else:
     print("Success -- transaction rejected")

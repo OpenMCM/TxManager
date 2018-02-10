@@ -121,6 +121,8 @@ class Datum:
     def dx_print(self):
         p = ""
         p += "        "
+        if(len(self.dx) == 0):
+            return
         for x in self.dx[0]:
             p += ''.join('{:02x}'.format(x))
         p += ",\n"
@@ -416,7 +418,8 @@ def transaction_is_valid(txHashChain, tx):
                 for datum in sx.data[:len(sx.data) - 1]:
                     if(not authed_minter_datum_well_formed(datum)):
                         # Fail
-                        print("Malformed authed_minter section ", sx)
+                        print("Malformed authed_minter section ")
+                        datum.dx_print()
                         return False
                     authed_minters.add(bytes(datum.dx[0]))
                     seen_auths += datum.dx[0] + b"\n"
