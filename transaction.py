@@ -59,7 +59,7 @@ def byte_array_to_string(b):
 # Pretty sure it'll be faster to check for well-formed-ness on the datum level
 # than to have a seperate function that loops through all sections.
 # Takes a [byteArray], returns a bool
-# Transaction quotes (i.e. inputs) have the form (txhash, output_index)
+# Transaction quotes (i.e. inputs) have the form (txhash, secType, output_index)
 def input_datum_well_formed(datum):
     if(len(datum.dx) != 3 or len(datum.dx[0]) != 32 or len(datum.dx[2]) != 4):
         return False
@@ -319,7 +319,8 @@ def transaction_is_valid(txHashChain, tx):
             for datum in sx.data:
                 if(not input_datum_well_formed(datum)):
                     # Fail
-                    print("Malformed input ", datum)
+                    print("Malformed input ")
+                    datum.dx_print()
                     return False
                 if(not txHashChain.quote_is_unspent(datum.dx)):
                     print("Error: input", datum.dx, " has already been spent")
@@ -390,7 +391,7 @@ def transaction_is_valid(txHashChain, tx):
             leftover_owners = inputs_owners.difference(addresses_signed)
 
             if(leftover_owners != set()):
-                print("Not enough signatures to validate signature")
+                print("Not enough signatures to validate transaction")
                 return False
 
         elif(sx.type == sectionType.COINCOLOR):
