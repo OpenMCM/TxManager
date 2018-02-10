@@ -376,3 +376,20 @@ if(txHC.insert_tx(tx)):
     print("Failure -- transaction accepted")
 else:
     print("Success -- transaction rejected")
+
+# Mallory tries to steal Bob's AliceCoin again, this time with no signature at all
+inputs_datum = Datum([tx_bob_gets_back_hash, bytes([sectionType.MINT_OUTPUTS.value]), bytearray(b"\x00\x00\x00\x00")])
+inputs_section = Section(sectionType.INPUTS, [inputs_datum])
+
+outputs_datum = Datum([mallory_ad, alice_coin_color, b"\x00\x01\x00\x00"])
+outputs_section = Section(sectionType.OUTPUTS, [outputs_datum])
+
+in_out_bytes = inputs_section.sx_to_bytes() + outputs_section.sx_to_bytes()
+sx_hash = hash_sha_256(bytes(in_out_bytes))
+
+tx = Transaction([inputs_section, outputs_section])
+
+if(txHC.insert_tx(tx)):
+    print("Failure -- transaction accepted")
+else:
+    print("Success -- transaction rejected")

@@ -591,7 +591,18 @@ def transaction_is_valid(txHashChain, tx):
             if(leftover_minted != set()):
                 print("Colors being minted without an authorized signature")
                 return False
-    return True
+
+    # Check that we have seen all the required sections
+    transfer_tx = set([sectionType.INPUTS, sectionType.OUTPUTS, sectionType.SIGNATURES])
+    mint_tx = set([sectionType.MINT_OUTPUTS, sectionType.SIG_MINT])
+    auth_tx = set([sectionType.AUTHED_MINTERS, sectionType.COINCOLOR])
+    deauth_tx = set([sectionType.DEAUTHED_MINTERS, sectionType.COINCOLOR])
+    auth_deauth_tx = set([sectionType.AUTHED_MINTERS, sectionType.DEAUTHED_MINTERS, sectionType.COINCOLOR])
+
+    if(seen_secs == transfer_tx or seen_secs == mint_tx or seen_secs == auth_tx or seen_secs == deauth_tx or seen_secs == auth_deauth_tx):
+        return True
+    else:
+        return False
 
 
 
