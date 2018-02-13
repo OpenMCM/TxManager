@@ -337,6 +337,7 @@ charlie_auth_mallory_sig_datum = Datum([charlie_vk.to_string(), charlie_auth_mal
 authed_section = Section(sectionType.AUTHED_MINTERS, [deauthed_datum, charlie_auth_mallory_sig_datum])
 
 tx_charlie_auth_mallory = Transaction([color_section, authed_section])
+tx_charlie_auth_mallory_hash = hash_sha_256(bytes(tx_charlie_auth_mallory.tx_to_bytes()))
 
 if(txHC.insert_tx(tx_charlie_auth_mallory)):
     print("Success -- transaction accepted")
@@ -440,6 +441,91 @@ tx_auth_mallory_hash = hash_sha_256(tx_auth_mallory.tx_to_bytes())
 
 
 if(txHC.insert_tx(tx_auth_mallory)):
+    print("Failure -- transaction accepted")
+else:
+    print("Success -- transaction rejected")
+
+# Mallory deauthorizes Charlie to mint AliceCoin
+# Charlie authorizes Mallory to mint AliceCoin
+color_datum = Datum([bytearray(b"\xde\xad\xbe\xef" * 8)])
+color_section = Section(sectionType.COINCOLOR, [color_datum])
+
+deauthed_datum = Datum([bytearray(charlie_ad)])
+
+charlie_addr_hash = hash_sha_256(bytes(charlie_ad + b"\n"))
+
+mallory_deauth_charlie_sig = sign(mallory_sk, charlie_addr_hash)
+mallory_deauth_charlie_sig_datum = Datum([mallory_vk.to_string(), mallory_deauth_charlie_sig, tx_charlie_auth_mallory_hash])
+
+deauthed_section = Section(sectionType.DEAUTHED_MINTERS, [deauthed_datum, mallory_deauth_charlie_sig_datum])
+
+tx_mallory_deauth_charlie = Transaction([color_section, deauthed_section])
+
+if(txHC.insert_tx(tx_mallory_deauth_charlie)):
+    print("Success -- transaction accepted")
+else:
+    print("Failure -- transaction rejected")
+
+# Charlie authorizes Alice to mint AliceCoin
+color_datum = Datum([bytearray(b"\xde\xad\xbe\xef" * 8)])
+color_section = Section(sectionType.COINCOLOR, [color_datum])
+
+authed_datum = Datum([bytearray(alice_ad)])
+
+alice_addr_hash = hash_sha_256(bytes(alice_ad + b"\n"))
+charlie_auth_alice_sig = sign(charlie_sk, alice_addr_hash)
+charlie_auth_alice_sig_datum = Datum([charlie_vk.to_string(), charlie_auth_alice_sig, tx_auth_charlie_forreal_hash])
+
+authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum, charlie_auth_alice_sig_datum])
+
+tx_charlie_auth_alice = Transaction([color_section, authed_section])
+tx_charlie_auth_alice_hash = hash_sha_256(bytes(tx_charlie_auth_alice.tx_to_bytes()))
+
+if(txHC.insert_tx(tx_charlie_auth_alice)):
+    print("Failure -- transaction accepted")
+else:
+    print("Success -- transaction rejected")
+
+# Mallory mints 1 AC, sends to himself
+mint_outputs_datum = Datum([bytearray(mallory_ad), alice_coin_color, bytearray(b"\x00\x01\x00\x00")])
+mint_outputs_section = Section(sectionType.MINT_OUTPUTS, [mint_outputs_datum])
+
+sig_mnt_hash_sha_256 = Datum([hash_sha_256(bytes(mint_outputs_section.sx_to_bytes()))])
+
+
+sig = sign(mallory_sk, hash_sha_256(bytes(mint_outputs_section.sx_to_bytes())))
+
+sig_mnt_datum = Datum([mallory_vk.to_string(), bytes(sign(mallory_sk, hash_sha_256(mint_outputs_section.sx_to_bytes()))), tx_charlie_auth_mallory_hash])
+
+sig_mnt_section = Section(sectionType.SIG_MINT, [sig_mnt_hash_sha_256, sig_mnt_datum])
+
+tx_mnt_two = Transaction([mint_outputs_section, sig_mnt_section])
+tx_mnt_mallory_hash = hash_sha_256(tx_mnt_two.tx_to_bytes())
+
+if(txHC.insert_tx(tx_mnt_two)):
+    print("Success -- transaction accepted")
+else:
+    print("Failure -- transaction rejected")
+
+# Mallory spends his AliceCoin, sends himself more than he spends
+inputs_datum = Datum([tx_mnt_mallory_hash, bytes([sectionType.MINT_OUTPUTS.value]), bytearray(b"\x00\x00\x00\x00")])
+inputs_section = Section(sectionType.INPUTS, [inputs_datum])
+
+outputs_datum = Datum([mallory_ad, alice_coin_color, bytearray(b"\x00\x0f\x00\x00")])
+outputs_section = Section(sectionType.OUTPUTS, [outputs_datum])
+
+tx_bytes = inputs_section.sx_to_bytes() + outputs_section.sx_to_bytes()
+
+mallory_sig = sign(mallory_sk, hash_sha_256(tx_bytes))
+hash_datum = Datum([hash_sha_256(tx_bytes)])
+sig_datum = Datum([mallory_vk.to_string(), mallory_sig])
+
+sig_section = Section(sectionType.SIGNATURES, [hash_datum, sig_datum])
+
+tx_mallory_overspends = Transaction([inputs_section, outputs_section, sig_section])
+tx_mallory_overspends_hash = hash_sha_256(tx_mallory_overspends.tx_to_bytes())
+
+if(txHC.insert_tx(tx_mallory_overspends)):
     print("Failure -- transaction accepted")
 else:
     print("Success -- transaction rejected")

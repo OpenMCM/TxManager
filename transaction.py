@@ -353,9 +353,9 @@ def transaction_is_valid(txHashChain, tx):
                     print("Malformed output ", datum)
                     return False
                 recipient = datum.dx[0]
-                color = int.from_bytes(datum.dx[1], byteorder='big', signed=False)
+                color = bytes(datum.dx[1])
                 quantity = int.from_bytes(datum.dx[2], byteorder='big', signed=False)
-                if(color in outputs):
+                if(color in outputs.keys()):
                     outputs[color] += quantity
                 else:
                     outputs[color] = quantity
@@ -368,6 +368,13 @@ def transaction_is_valid(txHashChain, tx):
                 # Fail
                 print("Missing outputs or inputs ", sx)
                 return False
+
+            # Assert non-negative entropy
+            for color in outputs.keys():
+                if(inputs[color] < outputs[color]):
+                    # Fail
+                    print("Error: non-negative entropy in coin color ", color)
+                    return False
 
             running_hash = hash_sha_256(seen_bytes)
             noted_hash = sx.data[0].dx[0]
