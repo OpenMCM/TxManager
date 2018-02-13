@@ -371,9 +371,13 @@ def transaction_is_valid(txHashChain, tx):
 
             # Assert non-negative entropy
             for color in outputs.keys():
-                if(inputs[color] < outputs[color]):
-                    # Fail
-                    print("Error: non-negative entropy in coin color ", color)
+                try:
+                    if(inputs[color] < outputs[color]):
+                        # Fail
+                        print("Error: non-negative entropy in coin color ", color)
+                        return False
+                except Exception as e:
+                    print("\n\ne\n\n")
                     return False
 
             running_hash = hash_sha_256(seen_bytes)

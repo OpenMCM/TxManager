@@ -351,7 +351,7 @@ authed_datum = Datum([bytearray(alice_ad)])
 authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum])
 tx_auth_alice = Transaction([color_section, authed_section])
 tx_auth_alice_hash = hash_sha_256(tx_auth_alice.tx_to_bytes())
-
+tx_permanent = tx_auth_alice_hash
 
 if(txHC.insert_tx(tx_auth_alice)):
     print("Success -- transaction accepted")
@@ -526,6 +526,56 @@ tx_mallory_overspends = Transaction([inputs_section, outputs_section, sig_sectio
 tx_mallory_overspends_hash = hash_sha_256(tx_mallory_overspends.tx_to_bytes())
 
 if(txHC.insert_tx(tx_mallory_overspends)):
+    print("Failure -- transaction accepted")
+else:
+    print("Success -- transaction rejected")
+
+# Mallory mints 1 AC, sends to himself, omits signature
+mint_outputs_datum = Datum([bytearray(mallory_ad), alice_coin_color, bytearray(b"\x00\x01\x00\x00")])
+mint_outputs_section = Section(sectionType.MINT_OUTPUTS, [mint_outputs_datum])
+
+tx_mnt_two = Transaction([mint_outputs_section])
+tx_mnt_mallory_hash = hash_sha_256(tx_mnt_two.tx_to_bytes())
+
+if(txHC.insert_tx(tx_mnt_two)):
+    print("Failure -- transaction accepted")
+else:
+    print("Success -- transaction rejected")
+
+# Alice mints 10 ACP, sends to Mallory
+mint_outs_datum = Datum([bytearray(mallory_ad), alice_coin_prime_color, bytearray(b"\x00\x0a\x00\x00")])
+mint_outs_section = Section(sectionType.MINT_OUTPUTS, [mint_outs_datum])
+mint_outs_section_bytes = mint_outs_section.sx_to_bytes()
+mint_outs_section_hash = hash_sha_256(mint_outs_section_bytes)
+
+sig = sign(alice_sk, mint_outs_section_hash)
+
+sig_mint_hash_datum = Datum([mint_outs_section_hash])
+sig_mint_sig_datum = Datum([alice_vk.to_string(), sig, tx_permanent])
+sig_mint_sig_section = Section(sectionType.SIG_MINT, [sig_mint_hash_datum, sig_mint_sig_datum])
+
+tx_mnt_ten = Transaction([mint_outs_section, sig_mint_sig_section])
+
+if(txHC.insert_tx(tx_mnt_ten)):
+    print("Success -- transaction accepted")
+else:
+    print("Failure -- transaction rejected")
+
+
+# Mallory submits a transaction with no inputs
+outputs_datum = Datum([mallory_ad, alice_coin_prime_color, bytearray(b"\x00\x0a\x00\x00")])
+outputs_section = Section(sectionType.OUTPUTS, [outputs_datum])
+outputs_section_hash = hash_sha_256(outputs_section.sx_to_bytes())
+
+sig = sign(mallory_sk, outputs_section_hash)
+
+hash_datum = Datum([outputs_section_hash])
+sig_datum = Datum([mallory_vk.to_string(), sig])
+sig_section = Section(sectionType.SIGNATURES, [hash_datum, sig_datum])
+
+tx = Transaction([outputs_section, sig_section])
+
+if(txHC.insert_tx(tx)):
     print("Failure -- transaction accepted")
 else:
     print("Success -- transaction rejected")
