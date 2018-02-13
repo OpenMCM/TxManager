@@ -1,6 +1,36 @@
 from txhashchain import *
 from transaction import *
 from cryptohelpers import *
+import random
+import os
+
+# Fuzzing helper functions
+def random_tx():
+    sx_list = []
+    for i in range(0, random.randint(0, 10)):
+        sx_list += [random_sx()]
+    return Transaction(sx_list)
+
+def random_sx():
+    dx_list = []
+    for i in range(0, random.randint(0, 100)):
+        dx_list += [random_dx()]
+    sx_section = sectionType(random.randint(1, 18))
+    return Section(sx_section, dx_list)
+
+def random_dx():
+    l = []
+    for i in range(0, random.randint(0, 100)):
+        # Make a 32-byte value
+        if(i % 5 == 1):
+            l += bytearray([32])
+        elif(i % 5 == 2):
+            l += bytearray([64])
+        elif(i % 5 == 3):
+            l += bytearray([4])
+        else:
+            l += bytearray([random.randint(0, 100)])
+    return Datum(l)
 
 txHC = TXHashChain()
 
@@ -601,3 +631,14 @@ else:
     print("Failure -- transaction rejected")
 
 txHC.txHashChain_print()
+
+print("Test suite finished! Beginning fuzzing procedure...")
+
+tx = random_tx()
+
+while(not txHC.insert_tx(tx)):
+    tx = random_tx()
+
+# If we got here, then that means that a transaction was accepted -- i.e.
+# something about the TVF is wrong... so we print the transaction
+tx.tx_print()

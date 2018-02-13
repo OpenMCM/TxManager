@@ -25,9 +25,19 @@ class TXHashChain:
     def insert_tx(self, tx):
         # Assume tx is a Transaction object
 
-        # Assert that the transaction is valid before inserting
-        if not transaction_is_valid(self, tx):
-            print("Error: invalid transaction")
+        # This is called "Pokemon error handling", and it's a really bad coding
+        # practice because we basically catch any and all errors indiscriminately,
+        # meaning that we don't actually understand what our code is doing.
+        # Thing is, in this case it's actually acceptable to do because a transaction
+        # that causes an error is inherently invalid, and we should reject it
+        # anyways.
+        try:
+            # Assert that the transaction is valid before inserting
+            if not transaction_is_valid(self, tx):
+                print("Error: invalid transaction")
+                return False
+        except Exception as e:
+            print("Error: invalid transaction caused error", e)
             return False
 
         # Create a new block by catting top_hash || txbytes
