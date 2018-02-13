@@ -555,6 +555,7 @@ sig_mint_sig_datum = Datum([alice_vk.to_string(), sig, tx_permanent])
 sig_mint_sig_section = Section(sectionType.SIG_MINT, [sig_mint_hash_datum, sig_mint_sig_datum])
 
 tx_mnt_ten = Transaction([mint_outs_section, sig_mint_sig_section])
+tx_mnt_ten_hash = hash_sha_256(tx_mnt_ten.tx_to_bytes())
 
 if(txHC.insert_tx(tx_mnt_ten)):
     print("Success -- transaction accepted")
@@ -579,3 +580,24 @@ if(txHC.insert_tx(tx)):
     print("Failure -- transaction accepted")
 else:
     print("Success -- transaction rejected")
+
+
+# Mallory submits a transaction with no outputs
+inputs_datum = Datum([tx_mnt_ten_hash, bytes([sectionType.MINT_OUTPUTS.value]), bytearray(b"\x00\x00\x00\x00")])
+inputs_section = Section(sectionType.INPUTS, [inputs_datum])
+inputs_section_hash = hash_sha_256(inputs_section.sx_to_bytes())
+
+sig = sign(mallory_sk, inputs_section_hash)
+
+hash_datum = Datum([inputs_section_hash])
+sig_datum = Datum([mallory_vk.to_string(), sig])
+sig_section = Section(sectionType.SIGNATURES, [hash_datum, sig_datum])
+
+tx = Transaction([inputs_section, sig_section])
+
+if(txHC.insert_tx(tx)):
+    print("Success -- transaction accepted")
+else:
+    print("Failure -- transaction rejected")
+
+txHC.txHashChain_print()

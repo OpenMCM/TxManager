@@ -343,10 +343,14 @@ def transaction_is_valid(txHashChain, tx):
         elif(sx.type == sectionType.OUTPUTS):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
-            if(sectionType.INPUTS not in seen_secs):
+
+            # Do we actually need this? I commented so I can decide later :P
+            """if(sectionType.INPUTS not in seen_secs):
                 # Fail
                 print("Output comes before input! ")
-                return False
+                return False"""
+
+
             for datum in sx.data:
                 if(not output_datum_well_formed(datum)):
                     # Fail
@@ -364,7 +368,7 @@ def transaction_is_valid(txHashChain, tx):
         elif(sx.type == sectionType.SIGNATURES):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
-            if(sectionType.OUTPUTS not in seen_secs or sectionType.INPUTS not in seen_secs):
+            if(sectionType.INPUTS not in seen_secs):
                 # Fail
                 print("Missing outputs or inputs ", sx)
                 return False
@@ -608,12 +612,13 @@ def transaction_is_valid(txHashChain, tx):
 
     # Check that we have seen all the required sections
     transfer_tx = set([sectionType.INPUTS, sectionType.OUTPUTS, sectionType.SIGNATURES])
+    tx_burn = set([sectionType.INPUTS, sectionType.SIGNATURES])
     mint_tx = set([sectionType.MINT_OUTPUTS, sectionType.SIG_MINT])
     auth_tx = set([sectionType.AUTHED_MINTERS, sectionType.COINCOLOR])
     deauth_tx = set([sectionType.DEAUTHED_MINTERS, sectionType.COINCOLOR])
     auth_deauth_tx = set([sectionType.AUTHED_MINTERS, sectionType.DEAUTHED_MINTERS, sectionType.COINCOLOR])
 
-    if(seen_secs == transfer_tx or seen_secs == mint_tx or seen_secs == auth_tx or seen_secs == deauth_tx or seen_secs == auth_deauth_tx):
+    if(seen_secs == transfer_tx or seen_secs == mint_tx or seen_secs == auth_tx or seen_secs == deauth_tx or seen_secs == auth_deauth_tx or seen_secs == tx_burn):
         return True
     else:
         return False
