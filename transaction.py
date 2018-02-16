@@ -305,6 +305,13 @@ def transaction_is_valid(txHashChain, tx):
     # And also those who are being deauthorized.
     deauthed_minters = set()
 
+    # A list of newly authed/deauthed minters. This needs to be in the function's
+    # global scope because we're gonna prepend a nonce to it that the auther
+    # auther must sign.
+    seen_auths = bytearray([])
+
+    nonce = bytearray([])
+
     # Takes a set of sectionTypes and a sectionType
     # Fails if (new in seen)
     # Else returns seen.add(new)
@@ -429,7 +436,7 @@ def transaction_is_valid(txHashChain, tx):
             auth_tx = txHashChain.color_has_been_authorized(coin_color)
 
             if(auth_tx != None):
-                seen_auths = bytearray([])
+                seen_auths += nonce
                 for datum in sx.data[:len(sx.data) - 1]:
                     if(not authed_minter_datum_well_formed(datum)):
                         # Fail
@@ -490,7 +497,8 @@ def transaction_is_valid(txHashChain, tx):
         elif(sx.type == sectionType.DEAUTHED_MINTERS):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
-            seen_auths = bytearray([])
+
+            seen_auths += nonce
             for datum in sx.data[:len(sx.data) - 1]:
                 if(not deauthed_minter_datum_well_formed(datum)):
                     # Fail
@@ -568,6 +576,9 @@ def transaction_is_valid(txHashChain, tx):
             running_hash = hash_sha_256(bytes(seen_bytes))
             noted_hash = sx.data[0].dx[0]
 
+            # Note: We don't need to reference the nonce here, since the
+            # nonce section is already hashed and signed
+
             colors_authorized_to_mint = set()
 
             if(running_hash != noted_hash):
@@ -610,13 +621,24 @@ def transaction_is_valid(txHashChain, tx):
                 print("Colors being minted without an authorized signature")
                 return False
 
+        elif(sx.type == sectionType.NONCE):
+            if(not nonce_section_well_formed(sx.data)):
+                print("Error: Malformed section")
+                sx.sx_print()
+            n = sx.data[0].dx[0]
+            if(not txHC.nonce_is_unused(n)):
+                print("Nonce has been used previously")
+                print(n)
+            nonce = n
+
+
     # Check that we have seen all the required sections
     transfer_tx = set([sectionType.INPUTS, sectionType.OUTPUTS, sectionType.SIGNATURES])
     tx_burn = set([sectionType.INPUTS, sectionType.SIGNATURES])
-    mint_tx = set([sectionType.MINT_OUTPUTS, sectionType.SIG_MINT])
-    auth_tx = set([sectionType.AUTHED_MINTERS, sectionType.COINCOLOR])
-    deauth_tx = set([sectionType.DEAUTHED_MINTERS, sectionType.COINCOLOR])
-    auth_deauth_tx = set([sectionType.AUTHED_MINTERS, sectionType.DEAUTHED_MINTERS, sectionType.COINCOLOR])
+    mint_tx = set([sectionType.NONCE, sectionType.MINT_OUTPUTS, sectionType.SIG_MINT])
+    auth_tx = set([sectionType.NONCE, sectionType.AUTHED_MINTERS, sectionType.COINCOLOR])
+    deauth_tx = set([sectionType.NONCE, sectionType.DEAUTHED_MINTERS, sectionType.COINCOLOR])
+    auth_deauth_tx = set([sectionType.NONCE, sectionType.AUTHED_MINTERS, sectionType.DEAUTHED_MINTERS, sectionType.COINCOLOR])
 
     # This bit is kinda dumb. Apparently sets aren't hashable in python, so we
     # need to check whether the transaction is well-formed for each possible

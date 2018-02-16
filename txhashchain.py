@@ -198,8 +198,3 @@ class TXHashChain:
         # The output is alread organized as a list of (o, c, q), so we can
         # just return the index in the output from here.
         return outputs.data[output_index].dx
-
-    # Iterate through txHashChain and verify that a given nonce has never
-    # been used before
-    def nonce_unused(self, nonce):
-        print("Placeholder")
