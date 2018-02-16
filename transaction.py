@@ -92,6 +92,12 @@ def deauthed_minter_datum_well_formed(datum):
     else:
         return True
 
+def nonce_section_well_formed(section):
+    if(len(section.data) != 1 or len(section.data[0].dx) != 1 or len(section.data[0].dx[0]) != 32):
+        return False
+    else:
+        return True
+
 # A datum is an n-element list of 32-byte values.
 class Datum:
     def __init__(self, dx):
@@ -622,14 +628,18 @@ def transaction_is_valid(txHashChain, tx):
                 return False
 
         elif(sx.type == sectionType.NONCE):
-            if(not nonce_section_well_formed(sx.data)):
+            seen_secs.add(sx.type)
+            if(not nonce_section_well_formed(sx)):
                 print("Error: Malformed section")
                 sx.sx_print()
+                return False
             n = sx.data[0].dx[0]
-            if(not txHC.nonce_is_unused(n)):
+            if(not txHashChain.nonce_is_unused(n)):
                 print("Nonce has been used previously")
                 print(n)
+                return False
             nonce = n
+            seen_bytes += sx.sx_to_bytes()
 
 
     # Check that we have seen all the required sections
@@ -646,6 +656,8 @@ def transaction_is_valid(txHashChain, tx):
     if(seen_secs == transfer_tx or seen_secs == mint_tx or seen_secs == auth_tx or seen_secs == deauth_tx or seen_secs == auth_deauth_tx or seen_secs == tx_burn):
         return True
     else:
+        print("Malformed transaction: ")
+        print(seen_secs)
         return False
     # TODO: Write a hash function for sets
     # NOTE: Here's a way to do this:

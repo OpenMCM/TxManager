@@ -69,6 +69,8 @@ print("Charlie's address: ", charlie_ad)
 print("Mallory's pubkey: ", mallory_vk.to_string())
 print("Mallory's address: ", mallory_ad)
 
+print(txHC.generate_unused_nonce())
+
 # Alice authorizes herself to mint AliceCoin
 # This transaction takes the form:
 #   coincolor: [
@@ -84,16 +86,19 @@ print("Constructing color section...")
 color_datum = Datum([bytearray(b"\xde\xad\xbe\xef" * 8)])
 color_section = Section(sectionType.COINCOLOR, [color_datum])
 
+print("Constructing nonce section...")
+nonce_datum = Datum([txHC.generate_unused_nonce()])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+
 print("Constructing authed_minters section...")
 authed_datum = Datum([bytearray(alice_ad)])
 authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum])
 
 print("Constructing transaction...")
-tx_auth_alice = Transaction([color_section, authed_section])
+tx_auth_alice = Transaction([nonce_section, color_section, authed_section])
 tx_auth_alice_hash = hash_sha_256(tx_auth_alice.tx_to_bytes())
 first_tx_hash = tx_auth_alice_hash
 print("Final transaction bytes: \n", tx_auth_alice.tx_to_bytes(), "\n\n")
-
 
 if(txHC.insert_tx(tx_auth_alice)):
     print("Success -- transaction accepted")
@@ -101,19 +106,23 @@ else:
     print("Failure -- transaction rejected")
 
 # Alice mints 2 AC, sends to herself
+nonce_datum = Datum([txHC.generate_unused_nonce()])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
 mint_outputs_datum = Datum([bytearray(alice_ad), alice_coin_color, bytearray(b"\x00\x02\x00\x00")])
 mint_outputs_section = Section(sectionType.MINT_OUTPUTS, [mint_outputs_datum])
 
-sig_mnt_hash_sha_256 = Datum([hash_sha_256(bytes(mint_outputs_section.sx_to_bytes()))])
+sig_bytes = bytes(mint_outputs_section.sx_to_bytes()) + bytes(nonce_section.sx_to_bytes())
+
+sig_mnt_hash_sha_256 = Datum([hash_sha_256(sig_bytes)])
 
 
-sig = sign(alice_sk, hash_sha_256(bytes(mint_outputs_section.sx_to_bytes())))
+sig = sign(alice_sk, hash_sha_256(sig_bytes))
 
-sig_mnt_datum = Datum([alice_vk.to_string(), bytes(sign(alice_sk, hash_sha_256(mint_outputs_section.sx_to_bytes()))), hash_sha_256(tx_auth_alice.tx_to_bytes())])
+sig_mnt_datum = Datum([alice_vk.to_string(), sig, hash_sha_256(tx_auth_alice.tx_to_bytes())])
 
 sig_mnt_section = Section(sectionType.SIG_MINT, [sig_mnt_hash_sha_256, sig_mnt_datum])
 
-tx_mnt_two = Transaction([mint_outputs_section, sig_mnt_section])
+tx_mnt_two = Transaction([mint_outputs_section, nonce_section, sig_mnt_section])
 tx_mnt_two_hash = hash_sha_256(tx_mnt_two.tx_to_bytes())
 
 if(txHC.insert_tx(tx_mnt_two)):
@@ -231,19 +240,36 @@ if(txHC.insert_tx(tx_auth_bob)):
 else:
     print("Success -- transaction rejected")
 
+# Bob reissues Alice's minting transaction
+if(txHC.insert_tx(tx_mnt_two)):
+    print("Failure -- transaction accepted")
+else:
+    print("Success -- transaction rejected")
+
+# Bob reissues Alice's transfer transaction
+if(txHC.insert_tx(tx_transfer)):
+    print("Failure -- transaction accepted")
+else:
+    print("Success -- transaction rejected")
+
+
 # Alice authorizes Bob to mint AliceCoin
 color_datum = Datum([bytearray(b"\xde\xad\xbe\xef" * 8)])
 color_section = Section(sectionType.COINCOLOR, [color_datum])
 
+nonce = txHC.generate_unused_nonce()
+nonce_datum = Datum([nonce])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+
 authed_datum = Datum([bytearray(bob_ad)])
 
-bob_addr_hash = hash_sha_256(bytes(bob_ad + b"\n"))
+bob_addr_hash = hash_sha_256(nonce + bytes(bob_ad + b"\n"))
 alice_auth_bob_sig = sign(alice_sk, bob_addr_hash)
 alice_auth_bob_sig_datum = Datum([alice_vk.to_string(), alice_auth_bob_sig, tx_auth_alice_hash])
 
 authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum, alice_auth_bob_sig_datum])
 
-tx_auth_bob_forreal = Transaction([color_section, authed_section])
+tx_auth_bob_forreal = Transaction([nonce_section, color_section, authed_section])
 tx_auth_bob_forreal_hash = hash_sha_256(tx_auth_bob_forreal.tx_to_bytes())
 
 if(txHC.insert_tx(tx_auth_bob_forreal)):
@@ -255,16 +281,19 @@ else:
 mint_outputs_datum = Datum([bytearray(bob_ad), alice_coin_color, bytearray(b"\x00\x01\x00\x00")])
 mint_outputs_section = Section(sectionType.MINT_OUTPUTS, [mint_outputs_datum])
 
-sig_mnt_hash_sha_256 = Datum([hash_sha_256(bytes(mint_outputs_section.sx_to_bytes()))])
+nonce_datum = Datum([txHC.generate_unused_nonce()])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
 
+sig_bytes = bytes(nonce_section.sx_to_bytes() + mint_outputs_section.sx_to_bytes())
+sig_mnt_hash_sha_256 = Datum([hash_sha_256(sig_bytes)])
 
-sig = sign(alice_sk, hash_sha_256(bytes(mint_outputs_section.sx_to_bytes())))
+sig = sign(bob_sk, hash_sha_256(sig_bytes))
 
-sig_mnt_datum = Datum([bob_vk.to_string(), bytes(sign(bob_sk, hash_sha_256(mint_outputs_section.sx_to_bytes()))), hash_sha_256(tx_auth_bob_forreal.tx_to_bytes())])
+sig_mnt_datum = Datum([bob_vk.to_string(), bytes(sig), hash_sha_256(tx_auth_bob_forreal.tx_to_bytes())])
 
 sig_mnt_section = Section(sectionType.SIG_MINT, [sig_mnt_hash_sha_256, sig_mnt_datum])
 
-tx_mnt_two = Transaction([mint_outputs_section, sig_mnt_section])
+tx_mnt_two = Transaction([nonce_section, mint_outputs_section, sig_mnt_section])
 tx_mnt_two_hash = hash_sha_256(tx_mnt_two.tx_to_bytes())
 tx_bob_gets_back_hash = tx_mnt_two_hash
 
@@ -273,20 +302,23 @@ if(txHC.insert_tx(tx_mnt_two)):
 else:
     print("Failure -- transaction rejected")
 
-
 # Bob deauthorizes himself to mint AliceCoin
 color_datum = Datum([bytearray(b"\xde\xad\xbe\xef" * 8)])
 color_section = Section(sectionType.COINCOLOR, [color_datum])
 
+nonce = txHC.generate_unused_nonce()
+nonce_datum = Datum([nonce])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+
 deauthed_datum = Datum([bytearray(bob_ad)])
 
-bob_addr_hash = hash_sha_256(bytes(bob_ad + b"\n"))
+bob_addr_hash = hash_sha_256(nonce + bytes(bob_ad + b"\n"))
 bob_deauth_bob_sig = sign(bob_sk, bob_addr_hash)
 bob_deauth_bob_sig_datum = Datum([bob_vk.to_string(), bob_deauth_bob_sig, tx_auth_bob_forreal_hash])
 
 deauthed_section = Section(sectionType.DEAUTHED_MINTERS, [deauthed_datum, bob_deauth_bob_sig_datum])
 
-tx_bob_deauth_bob = Transaction([color_section, deauthed_section])
+tx_bob_deauth_bob = Transaction([nonce_section, color_section, deauthed_section])
 
 if(txHC.insert_tx(tx_bob_deauth_bob)):
     print("Success -- transaction accepted")
@@ -319,15 +351,19 @@ else:
 color_datum = Datum([bytearray(b"\xde\xad\xbe\xef" * 8)])
 color_section = Section(sectionType.COINCOLOR, [color_datum])
 
+nonce = txHC.generate_unused_nonce()
+nonce_datum = Datum([nonce])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+
 authed_datum = Datum([bytearray(charlie_ad)])
 
-charlie_addr_hash = hash_sha_256(bytes(charlie_ad + b"\n"))
+charlie_addr_hash = hash_sha_256(bytes(nonce + charlie_ad + b"\n"))
 alice_auth_charlie_sig = sign(alice_sk, charlie_addr_hash)
 alice_auth_charlie_sig_datum = Datum([alice_vk.to_string(), alice_auth_charlie_sig, tx_auth_alice_hash])
 
 authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum, alice_auth_charlie_sig_datum])
 
-tx_auth_charlie_forreal = Transaction([color_section, authed_section])
+tx_auth_charlie_forreal = Transaction([nonce_section, color_section, authed_section])
 tx_auth_charlie_forreal_hash = hash_sha_256(tx_auth_charlie_forreal.tx_to_bytes())
 
 if(txHC.insert_tx(tx_auth_charlie_forreal)):
@@ -339,15 +375,19 @@ else:
 color_datum = Datum([bytearray(b"\xde\xad\xbe\xef" * 8)])
 color_section = Section(sectionType.COINCOLOR, [color_datum])
 
+nonce = txHC.generate_unused_nonce()
+nonce_datum = Datum([nonce])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+
 deauthed_datum = Datum([bytearray(alice_ad)])
 
-alice_addr_hash = hash_sha_256(bytes(alice_ad + b"\n"))
+alice_addr_hash = hash_sha_256(bytes(nonce + alice_ad + b"\n"))
 charlie_deauth_alice_sig = sign(charlie_sk, alice_addr_hash)
 charlie_deauth_alice_sig_datum = Datum([charlie_vk.to_string(), charlie_deauth_alice_sig, tx_auth_charlie_forreal_hash])
 
 deauthed_section = Section(sectionType.DEAUTHED_MINTERS, [deauthed_datum, charlie_deauth_alice_sig_datum])
 
-tx_charlie_deauth_alice = Transaction([color_section, deauthed_section])
+tx_charlie_deauth_alice = Transaction([nonce_section, color_section, deauthed_section])
 
 if(txHC.insert_tx(tx_charlie_deauth_alice)):
     print("Success -- transaction accepted")
@@ -358,15 +398,19 @@ else:
 color_datum = Datum([bytearray(b"\xde\xad\xbe\xef" * 8)])
 color_section = Section(sectionType.COINCOLOR, [color_datum])
 
+nonce = txHC.generate_unused_nonce()
+nonce_datum = Datum([nonce])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+
 deauthed_datum = Datum([bytearray(mallory_ad)])
 
-mallory_addr_hash = hash_sha_256(bytes(mallory_ad + b"\n"))
+mallory_addr_hash = hash_sha_256(bytes(nonce + mallory_ad + b"\n"))
 charlie_auth_mallory_sig = sign(charlie_sk, mallory_addr_hash)
 charlie_auth_mallory_sig_datum = Datum([charlie_vk.to_string(), charlie_auth_mallory_sig, tx_auth_charlie_forreal_hash])
 
 authed_section = Section(sectionType.AUTHED_MINTERS, [deauthed_datum, charlie_auth_mallory_sig_datum])
 
-tx_charlie_auth_mallory = Transaction([color_section, authed_section])
+tx_charlie_auth_mallory = Transaction([nonce_section, color_section, authed_section])
 tx_charlie_auth_mallory_hash = hash_sha_256(bytes(tx_charlie_auth_mallory.tx_to_bytes()))
 
 if(txHC.insert_tx(tx_charlie_auth_mallory)):
@@ -377,9 +421,14 @@ else:
 # Alice authorizes herself to mint AliceCoinPrime
 color_datum = Datum([alice_coin_prime_color])
 color_section = Section(sectionType.COINCOLOR, [color_datum])
+
+nonce = txHC.generate_unused_nonce()
+nonce_datum = Datum([nonce])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+
 authed_datum = Datum([bytearray(alice_ad)])
 authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum])
-tx_auth_alice = Transaction([color_section, authed_section])
+tx_auth_alice = Transaction([nonce_section, color_section, authed_section])
 tx_auth_alice_hash = hash_sha_256(tx_auth_alice.tx_to_bytes())
 tx_permanent = tx_auth_alice_hash
 
@@ -480,16 +529,20 @@ else:
 color_datum = Datum([bytearray(b"\xde\xad\xbe\xef" * 8)])
 color_section = Section(sectionType.COINCOLOR, [color_datum])
 
+nonce = txHC.generate_unused_nonce()
+nonce_datum = Datum([nonce])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+
 deauthed_datum = Datum([bytearray(charlie_ad)])
 
-charlie_addr_hash = hash_sha_256(bytes(charlie_ad + b"\n"))
+charlie_addr_hash = hash_sha_256(bytes(nonce + charlie_ad + b"\n"))
 
 mallory_deauth_charlie_sig = sign(mallory_sk, charlie_addr_hash)
 mallory_deauth_charlie_sig_datum = Datum([mallory_vk.to_string(), mallory_deauth_charlie_sig, tx_charlie_auth_mallory_hash])
 
 deauthed_section = Section(sectionType.DEAUTHED_MINTERS, [deauthed_datum, mallory_deauth_charlie_sig_datum])
 
-tx_mallory_deauth_charlie = Transaction([color_section, deauthed_section])
+tx_mallory_deauth_charlie = Transaction([nonce_section, color_section, deauthed_section])
 
 if(txHC.insert_tx(tx_mallory_deauth_charlie)):
     print("Success -- transaction accepted")
@@ -520,22 +573,29 @@ else:
 mint_outputs_datum = Datum([bytearray(mallory_ad), alice_coin_color, bytearray(b"\x00\x01\x00\x00")])
 mint_outputs_section = Section(sectionType.MINT_OUTPUTS, [mint_outputs_datum])
 
-sig_mnt_hash_sha_256 = Datum([hash_sha_256(bytes(mint_outputs_section.sx_to_bytes()))])
+nonce = txHC.generate_unused_nonce()
+nonce_datum = Datum([nonce])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+
+sig_bytes = bytes(nonce_section.sx_to_bytes() + mint_outputs_section.sx_to_bytes())
+
+sig_mnt_hash_sha_256 = Datum([hash_sha_256(sig_bytes)])
 
 
-sig = sign(mallory_sk, hash_sha_256(bytes(mint_outputs_section.sx_to_bytes())))
+sig = sign(mallory_sk, hash_sha_256(sig_bytes))
 
-sig_mnt_datum = Datum([mallory_vk.to_string(), bytes(sign(mallory_sk, hash_sha_256(mint_outputs_section.sx_to_bytes()))), tx_charlie_auth_mallory_hash])
+sig_mnt_datum = Datum([mallory_vk.to_string(), bytes(sign(mallory_sk, hash_sha_256(sig_bytes))), tx_charlie_auth_mallory_hash])
 
 sig_mnt_section = Section(sectionType.SIG_MINT, [sig_mnt_hash_sha_256, sig_mnt_datum])
 
-tx_mnt_two = Transaction([mint_outputs_section, sig_mnt_section])
+tx_mnt_two = Transaction([nonce_section, mint_outputs_section, sig_mnt_section])
 tx_mnt_mallory_hash = hash_sha_256(tx_mnt_two.tx_to_bytes())
 
 if(txHC.insert_tx(tx_mnt_two)):
     print("Success -- transaction accepted")
 else:
     print("Failure -- transaction rejected")
+
 
 # Mallory spends his AliceCoin, sends himself more than he spends
 inputs_datum = Datum([tx_mnt_mallory_hash, bytes([sectionType.MINT_OUTPUTS.value]), bytearray(b"\x00\x00\x00\x00")])
@@ -576,7 +636,12 @@ else:
 mint_outs_datum = Datum([bytearray(mallory_ad), alice_coin_prime_color, bytearray(b"\x00\x0a\x00\x00")])
 mint_outs_section = Section(sectionType.MINT_OUTPUTS, [mint_outs_datum])
 mint_outs_section_bytes = mint_outs_section.sx_to_bytes()
-mint_outs_section_hash = hash_sha_256(mint_outs_section_bytes)
+
+nonce = txHC.generate_unused_nonce()
+nonce_datum = Datum([nonce])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+
+mint_outs_section_hash = hash_sha_256(mint_outs_section_bytes + nonce_section.sx_to_bytes())
 
 sig = sign(alice_sk, mint_outs_section_hash)
 
@@ -584,14 +649,13 @@ sig_mint_hash_datum = Datum([mint_outs_section_hash])
 sig_mint_sig_datum = Datum([alice_vk.to_string(), sig, tx_permanent])
 sig_mint_sig_section = Section(sectionType.SIG_MINT, [sig_mint_hash_datum, sig_mint_sig_datum])
 
-tx_mnt_ten = Transaction([mint_outs_section, sig_mint_sig_section])
+tx_mnt_ten = Transaction([mint_outs_section, nonce_section, sig_mint_sig_section])
 tx_mnt_ten_hash = hash_sha_256(tx_mnt_ten.tx_to_bytes())
 
 if(txHC.insert_tx(tx_mnt_ten)):
     print("Success -- transaction accepted")
 else:
     print("Failure -- transaction rejected")
-
 
 # Mallory submits a transaction with no inputs
 outputs_datum = Datum([mallory_ad, alice_coin_prime_color, bytearray(b"\x00\x0a\x00\x00")])

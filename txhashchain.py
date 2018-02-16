@@ -8,6 +8,8 @@ from transaction import *
 
 from cryptohelpers import *
 
+import secrets
+
 bottom_hash = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 
 class TXHashChain:
@@ -178,7 +180,18 @@ class TXHashChain:
                 if(n == nonce):
                     return False
             curr_hash = curr_block[0]
-        return False
+        return True
+
+    # There isn't really a way to do this without iterating through the whole
+    # txHC. Might as well make it a constant factor times the number of blocks.
+    def generate_unused_nonce(self):
+        # Generate a random 32-byte value
+        nonce = secrets.token_bytes(32)
+        # Make sure it's unused
+        if(not self.nonce_is_unused(nonce)):
+            return self.generate_unused_nonce()
+        else:
+            return nonce
 
     # Takes a (txhash, section_id, output_index) as argument
     # Returns (owner, color, quantity) or (owner, quantity)
