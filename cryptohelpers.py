@@ -23,16 +23,3 @@ def sign(privkey, message):
 
 def verify(pubkey, h, sig):
     return pubkey.verify(sig, h)
-
-"""
-message = hash(b"message")
-print(''.join('{:02x}'.format(x) for x in message))
-
-sk = gen_privkey()
-pk = gen_pubkey(sk)
-
-print(''.join('{:02x}'.format(x) for x in sign(sk, message)))
-
-print(verify(pk, message, sign(sk, message)))
-print(verify(pk, message, sign(sk, hash(b"Fleeple"))))
-"""

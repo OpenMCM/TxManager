@@ -622,35 +622,3 @@ def transaction_is_valid(txHashChain, tx):
         return True
     else:
         return False
-
-
-
-# Simple test vector
-# TODO: Write actual test cases for this
-"""
-d = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
-dp = Datum([b'gggggggggggggggggggggggggggggggg'])
-s = Section(sectionType.INPUTS, [d, dp])
-t = Transaction([s])
-
-print("Not decoded:")
-print(t.tx_to_bytes())
-print("Decoded:")
-print(bytes_to_tx(t.tx_to_bytes()).tx_to_bytes())
-
-
-d1 = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
-s1 = Section(sectionType.PAINT_INPUTS, [d1])
-d2 = Datum([b'ffffffffffffffffffffffffffffffff', b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
-s2 = Section(sectionType.PAINT_OUTPUTS, [d1, d2])
-t2 = Transaction([s1, s2])
-
-print("Not decoded: ")
-print(t2.tx_to_bytes())
-print("Decoded:")
-print(bytes_to_tx(t2.tx_to_bytes()).tx_to_bytes())
-print(t)
-
-print(t2.strip_section(sectionType.PAINT_INPUTS).tx_to_bytes())
-
-print("\n\n", byte_to_st(0x01))"""

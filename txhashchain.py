@@ -29,8 +29,7 @@ class TXHashChain:
         # practice because we basically catch any and all errors indiscriminately,
         # meaning that we don't actually understand what our code is doing.
         # Thing is, in this case it's actually acceptable to do because a transaction
-        # that causes an error is inherently invalid, and we should reject it
-        # anyways.
+        # that causes an error is invalid, and we should reject it anyways.
         try:
             # Assert that the transaction is valid before inserting
             if not transaction_is_valid(self, tx):
