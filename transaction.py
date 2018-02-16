@@ -618,7 +618,22 @@ def transaction_is_valid(txHashChain, tx):
     deauth_tx = set([sectionType.DEAUTHED_MINTERS, sectionType.COINCOLOR])
     auth_deauth_tx = set([sectionType.AUTHED_MINTERS, sectionType.DEAUTHED_MINTERS, sectionType.COINCOLOR])
 
+    # This bit is kinda dumb. Apparently sets aren't hashable in python, so we
+    # need to check whether the transaction is well-formed for each possible
+    # structure with a really big 'if' statement.
     if(seen_secs == transfer_tx or seen_secs == mint_tx or seen_secs == auth_tx or seen_secs == deauth_tx or seen_secs == auth_deauth_tx or seen_secs == tx_burn):
         return True
     else:
         return False
+    # TODO: Write a hash function for sets
+    # NOTE: Here's a way to do this:
+    # We have a list of unique prime numbers, p, that has the same length as
+    # the list of all possible sections.
+    # We represent a transaction's section structure as a list of 0's and 1's,
+    # where a 1 represents a sectionType's presence in a transaction, and a 0
+    # the sectionType's absence. Let's call this list s
+    # We let hash = product(p[i] ** s[i] for i in len(p))
+    # Two transactions with the same sections in different orders will have the
+    # same hash by commutativity of multiplication. Two transactions with
+    # different sections will not have the same hash, by the Fundamental
+    # Theorem of Arithmetic.
