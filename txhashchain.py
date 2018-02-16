@@ -160,6 +160,26 @@ class TXHashChain:
 
             curr_hash = curr_block[0]
 
+    # Takes a nonce and returns a bool denoting whether the given nonce has
+    # been used in the txHashChain previously.
+    # A nonce is a bytearray, which we will allow to be of variable length
+    # to make things easy
+    def nonce_is_unused(self, nonce):
+        curr_hash = self.most_recent_block
+
+        while curr_hash != bottom_hash:
+            curr_block = self.chain[curr_hash]
+            curr_tx = curr_block[1]
+
+            nonce_section = curr_tx.get_section(sectionType.NONCE)
+            if(nonce_section != None):
+                # Since we're indexing into the TXHC, we assume it's well-formed
+                n = nonce_section.data[0].dx[0]
+                if(n == nonce):
+                    return False
+            curr_hash = curr_block[0]
+        return False
+
     # Takes a (txhash, section_id, output_index) as argument
     # Returns (owner, color, quantity) or (owner, quantity)
     #   - Note: Will only return (owner, quantity) if we allow for black coins!
