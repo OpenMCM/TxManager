@@ -386,17 +386,6 @@ def transaction_is_valid(txHashChain, tx):
                 print("Missing outputs or inputs ", sx)
                 return False
 
-            # Assert non-negative entropy
-            for color in outputs.keys():
-                try:
-                    if(inputs[color] < outputs[color]):
-                        # Fail
-                        print("Error: non-negative entropy in coin color ", color)
-                        return False
-                except Exception as e:
-                    print("\n\ne\n\n")
-                    return False
-
             running_hash = hash_sha_256(seen_bytes)
             noted_hash = sx.data[0].dx[0]
 
@@ -641,6 +630,16 @@ def transaction_is_valid(txHashChain, tx):
             nonce = n
             seen_bytes += sx.sx_to_bytes()
 
+    # Assert non-negative entropy
+    for color in outputs.keys():
+        try:
+            if(inputs[color] < outputs[color]):
+                # Fail
+                print("Error: non-negative entropy in coin color ", color)
+                return False
+        except Exception as e:
+            print("\n\ne\n\n")
+            return False
 
     # Check that we have seen all the required sections
     transfer_tx = set([sectionType.INPUTS, sectionType.OUTPUTS, sectionType.SIGNATURES])
