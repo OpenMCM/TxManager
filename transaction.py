@@ -274,13 +274,13 @@ def transaction_is_valid(txHashChain, tx):
 
     # Preliminary version: Only works with non-wildcard shuffles
 
-    # A set of the owners of non-wildcard inputs
-    owners = set()
-
     # A mapping of colors to quantity of coins
     inputs = {}
 
+    # Sets of addresses that own coins in the inputs and wildcard_inputs sections,
+    # respectively
     inputs_owners = set()
+    wildcard_inputs_owners = set()
 
     # A mapping of colors to quantities. We don't care about recipients because
     # -- well, we don't care about recipients. The point of this is to make
@@ -316,6 +316,10 @@ def transaction_is_valid(txHashChain, tx):
     # auther must sign.
     seen_auths = bytearray([])
 
+    # A mapping of 32-byte pseudonyms to addresses
+    wildcard_ids = {}
+
+    # An n-byte nonce
     nonce = bytearray([])
 
     # Takes a set of sectionTypes and a sectionType
@@ -350,10 +354,37 @@ def transaction_is_valid(txHashChain, tx):
                 else:
                     inputs[color] = quantity
                     inputs_owners.add(owner)
-                owners.add(owner)
-            seen_bytes += sx.sx_to_bytes()
 
-        elif(sx.type == sectionType.OUTPUTS):
+            #seen_bytes += sx.sx_to_bytes()
+        # inputs and wildcard_inputs have similar behavior, except wildcard_inputs
+        # stores the owners' addresses in a different set than inputs
+        if(sx.type == sectionType.WILDCARD_INPUTS):
+            check_section_duplicate(seen_secs, sx.type)
+            seen_secs.add(sx.type)
+            for datum in sx.data:
+                if(not input_datum_well_formed(datum)):
+                    # Fail
+                    print("Malformed input ")
+                    datum.dx_print()
+                    return False
+                if(not txHashChain.quote_is_unspent(datum.dx)):
+                    print("Error: input", datum.dx, " has already been spent")
+                    return False
+                quote = txHashChain.find_owner_and_quantity_by_quote(datum.dx)
+                owner = bytes(quote[0])
+                color = bytes(quote[1])
+                quantity = int.from_bytes(quote[2], byteorder='big', signed=False)
+                if color in inputs.keys():
+                    inputs[color] += quantity
+                    wildcard_inputs_owners.add(owner)
+                else:
+                    inputs[color] = quantity
+                    wildcard_inputs_owners.add(owner)
+            #seen_bytes += sx.sx_to_bytes()
+
+        # OUTPUTS and WILDCARD_CHANGE sections have the same behavior
+        elif(sx.type == sectionType.OUTPUTS or
+             sx.type == sectionType.WILDCARD_CHANGE):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
 
@@ -376,7 +407,7 @@ def transaction_is_valid(txHashChain, tx):
                     outputs[color] += quantity
                 else:
                     outputs[color] = quantity
-            seen_bytes += sx.sx_to_bytes()
+            #seen_bytes += sx.sx_to_bytes()
 
         elif(sx.type == sectionType.SIGNATURES):
             check_section_duplicate(seen_secs, sx.type)
@@ -422,7 +453,7 @@ def transaction_is_valid(txHashChain, tx):
                 return False
             color = sx.data[0].dx[0]
             coin_color = color
-            seen_bytes += sx.sx_to_bytes()
+            #seen_bytes += sx.sx_to_bytes()
 
         elif(sx.type == sectionType.AUTHED_MINTERS):
             check_section_duplicate(seen_secs, sx.type)
@@ -477,7 +508,7 @@ def transaction_is_valid(txHashChain, tx):
                     print("Error: unauthorized minter's signature")
                     return False
 
-                seen_bytes += sx.sx_to_bytes()
+                #seen_bytes += sx.sx_to_bytes()
             else:
                 # The color has not been authorized before, and we can proceed
                 # as normal
@@ -487,7 +518,7 @@ def transaction_is_valid(txHashChain, tx):
                         print("Malformed authed_minter section ", sx)
                         return False
                     authed_minters.add(bytes(datum.dx[0]))
-                seen_bytes += sx.sx_to_bytes()
+                #seen_bytes += sx.sx_to_bytes()
 
         elif(sx.type == sectionType.DEAUTHED_MINTERS):
             check_section_duplicate(seen_secs, sx.type)
@@ -537,7 +568,7 @@ def transaction_is_valid(txHashChain, tx):
                 print("Error: unauthorized minter's signature")
                 return False
 
-            seen_bytes += sx.sx_to_bytes()
+            #seen_bytes += sx.sx_to_bytes()
 
         elif(sx.type == sectionType.MINT_OUTPUTS):
             check_section_duplicate(seen_secs, sx.type)
@@ -554,7 +585,7 @@ def transaction_is_valid(txHashChain, tx):
                 quantity = int.from_bytes(datum.dx[2], byteorder='big', signed=False)
                 if(color not in mint_outputs):
                     mint_outputs.add(color)
-                seen_bytes += sx.sx_to_bytes()
+                #seen_bytes += sx.sx_to_bytes()
 
         elif(sx.type == sectionType.SIG_MINT):
             check_section_duplicate(seen_secs, sx.type)
@@ -628,7 +659,81 @@ def transaction_is_valid(txHashChain, tx):
                 print(n)
                 return False
             nonce = n
-            seen_bytes += sx.sx_to_bytes()
+            #seen_bytes += sx.sx_to_bytes()
+        elif(sx.type == sectionType.WILDCARD_OUTPUTS):
+            check_section_duplicate(seen_secs, sx.type)
+            seen_secs.add(sx.type)
+
+            # Note: wildcard_outputs has the same properties as outputs, except
+            # we need to keep a set of wildcard_id's used
+
+            for datum in sx.data:
+                if(not output_datum_well_formed(datum)):
+                    # Fail
+                    print("Malformed output ", datum)
+                    return False
+                recipient = datum.dx[0]
+                color = bytes(datum.dx[1])
+                quantity = int.from_bytes(datum.dx[2], byteorder='big', signed=False)
+                wildcard_ids[bytes(recipient)] = None
+                if(color in outputs.keys()):
+                    outputs[color] += quantity
+                else:
+                    outputs[color] = quantity
+            #seen_bytes += sx.sx_to_bytes()
+        elif(sx.type == sectionType.WILDCARD_ID):
+            check_section_duplicate(seen_secs, sx.type)
+            seen_secs.add(sx.type)
+
+            for datum in sx.data:
+                if(not wildcard_id_datum_well_formed(datum)):
+                    # Fail
+                    print("Malformed wildcard id ", datum)
+                    return False
+                else:
+                    pseudonym = datum.dx[0]
+                    address = datum.dx[1]
+                    wildcard_ids[bytes(pseudonym)] = address
+            #seen_bytes += sx.sx_to_bytes()
+
+        elif(sx.type == sectionType.WILDCARD_SIGNATURES):
+            check_section_duplicate(seen_secs, sx.type)
+            seen_secs.add(sx.type)
+            if(sectionType.INPUTS not in seen_secs):
+                # Fail
+                print("Missing outputs or inputs ", sx)
+                return False
+
+            running_hash = hash_sha_256(seen_bytes)
+            noted_hash = sx.data[0].dx[0]
+
+            if(running_hash != noted_hash):
+                print("Hash mismatch between ", running_hash, " and ", noted_hash)
+                return False
+
+            addresses_signed = set()
+
+            for signature in sx.data[1:]:
+                pubkey = signature.dx[0]
+                sig = signature.dx[1]
+                addresses_signed.add(hash_sha_256(pubkey))
+                try:
+                    vk = gen_pubkey_from_bytes(pubkey)
+                    verify(vk, noted_hash, sig)
+                except:
+                    # Signature is invalid! Return False
+                    print("Invalid signature: ", signature)
+                    return False
+
+            leftover_owners = wildcard_inputs_owners.difference(addresses_signed)
+
+            if(leftover_owners != set()):
+                print("Not enough signatures to validate transaction")
+                return False
+
+        # Regardless of which section type we saw, we need to add it to the
+        # Seen_bytes
+        seen_bytes += sx.sx_to_bytes()
 
     # Assert non-negative entropy
     for color in outputs.keys():
