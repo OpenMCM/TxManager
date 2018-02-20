@@ -15,7 +15,7 @@ def random_sx():
     dx_list = []
     for i in range(0, random.randint(0, 100)):
         dx_list += [random_dx()]
-    sx_section = sectionType(random.randint(1, 18))
+    sx_section = sectionType(random.randint(1, 19))
     return Section(sx_section, dx_list)
 
 def random_dx():

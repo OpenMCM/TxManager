@@ -38,6 +38,7 @@ class sectionType(Enum):
     MINT_OUTPUTS = 16
     SIG_MINT = 17
     SIG_PAINT = 18
+    BURN = 19
 
 def st_to_bytes(type):
     for i in range(1, len(sectionType) + 1):
@@ -680,7 +681,24 @@ def transaction_is_valid(txHashChain, tx):
                     outputs[color] += quantity
                 else:
                     outputs[color] = quantity
-            #seen_bytes += sx.sx_to_bytes()
+        elif(sx.type == sectionType.BURN):
+            # A BURN is the exact same as OUTPUTS and WILDCARD_OUTPUTS, except
+            # all outputs are sent to the implicit NULL address, which can't
+            # spend any tokens, ever
+            check_section_duplicate(seen_secs, sx.type)
+            seen_secs.add(sx.type)
+
+            for datum in sx.data:
+                if(not output_datum_well_formed(datum)):
+                    # Fail
+                    print("Malformed output ", datum)
+                    return False
+                color = bytes(datum.dx[0])
+                quantity = int.from_bytes(datum.dx[1], byteorder='big', signed=False)
+                if(color in outputs.keys()):
+                    outputs[color] += quantity
+                else:
+                    outputs[color] = quantity
         elif(sx.type == sectionType.WILDCARD_ID):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
