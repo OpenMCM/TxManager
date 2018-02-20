@@ -69,7 +69,7 @@ print("Charlie's address: ", charlie_ad)
 print("Mallory's pubkey: ", mallory_vk.to_string())
 print("Mallory's address: ", mallory_ad)
 
-print(txHC.generate_unused_nonce())
+print("Beginning standard test suite...")
 
 # Alice authorizes herself to mint AliceCoin
 # This transaction takes the form:
@@ -696,7 +696,9 @@ else:
 
 txHC.txHashChain_print()
 
-print("Test suite finished! Beginning fuzzing procedure...")
+print("Beginning Wildcard Test Suite...")
+
+print("Test suites finished! Beginning fuzzing procedure...")
 
 tx = random_tx()
 
