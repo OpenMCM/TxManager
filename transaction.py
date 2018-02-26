@@ -450,7 +450,8 @@ def transaction_is_valid(txHashChain, tx):
             seen_secs.add(sx.type)
             if(not coincolor_section_well_formed(sx)):
                 # Fail
-                print("Malformed coincolor section ", sx)
+                print("Malformed coincolor section:")
+                sx.sx_print()
                 return False
             color = sx.data[0].dx[0]
             coin_color = color

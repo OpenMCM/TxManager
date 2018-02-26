@@ -694,9 +694,103 @@ if(txHC.insert_tx(tx)):
 else:
     print("Failure -- transaction rejected")
 
-txHC.txHashChain_print()
-
 print("Beginning Wildcard Test Suite...")
+
+# The colors of coins we're gonna trade:
+BTC = bytearray(b"\xbb\xbb\xbb\xbb" * 8)
+ETH = bytearray(b"\xee\xee\xee\xee" * 8)
+
+# 'f' is for 'fraud'
+QRK = bytearray(b"\xff\xff\xff\xff" * 8)
+
+# Alice authorizes herself to mint BTC
+print(BTC)
+color_datum = Datum([BTC])
+color_section = Section(sectionType.COINCOLOR, [color_datum])
+
+nonce = txHC.generate_unused_nonce()
+nonce_datum = Datum([nonce])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+
+authed_datum = Datum([bytearray(alice_ad)])
+authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum])
+
+tx = Transaction([nonce_section, color_section, authed_section])
+tx_hash_00 = hash_sha_256(tx.tx_to_bytes())
+
+if(txHC.insert_tx(tx)):
+    print("Success -- transaction accepted")
+else:
+    print("Failure -- transaction rejected")
+
+# Bob authorizes himself to mint ETH
+color_datum = Datum([ETH])
+color_section = Section(sectionType.COINCOLOR, [color_datum])
+
+nonce = txHC.generate_unused_nonce()
+nonce_datum = Datum([nonce])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+
+authed_datum = Datum([bytearray(bob_ad)])
+authed_section = Section(sectionType.AUTHED_MINTERS, [authed_datum])
+
+tx = Transaction([nonce_section, color_section, authed_section])
+tx_hash_01 = hash_sha_256(tx.tx_to_bytes())
+
+if(txHC.insert_tx(tx)):
+    print("Success -- transaction accepted")
+else:
+    print("Failure -- transaction rejected")
+
+# Alice mints 2x BTC
+nonce_datum = Datum([txHC.generate_unused_nonce()])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+mint_outputs_datum = Datum([bytearray(alice_ad), BTC, bytearray(b"\x00\x02\x00\x00")])
+mint_outputs_section = Section(sectionType.MINT_OUTPUTS, [mint_outputs_datum])
+
+sig_bytes = bytes(mint_outputs_section.sx_to_bytes()) + bytes(nonce_section.sx_to_bytes())
+
+sig_mnt_hash_sha_256 = Datum([hash_sha_256(sig_bytes)])
+
+sig = sign(alice_sk, hash_sha_256(sig_bytes))
+
+sig_mnt_datum = Datum([alice_vk.to_string(), sig, tx_hash_00])
+
+sig_mnt_section = Section(sectionType.SIG_MINT, [sig_mnt_hash_sha_256, sig_mnt_datum])
+
+tx = Transaction([mint_outputs_section, nonce_section, sig_mnt_section])
+tx_hash_02 = hash_sha_256(tx.tx_to_bytes())
+
+if(txHC.insert_tx(tx)):
+    print("Success -- transaction accepted")
+else:
+    print("Failure -- transaction rejected")
+
+# Bob mints 2x ETH
+nonce_datum = Datum([txHC.generate_unused_nonce()])
+nonce_section = Section(sectionType.NONCE, [nonce_datum])
+mint_outputs_datum = Datum([bytearray(bob_ad), ETH, bytearray(b"\x00\x02\x00\x00")])
+mint_outputs_section = Section(sectionType.MINT_OUTPUTS, [mint_outputs_datum])
+
+sig_bytes = bytes(mint_outputs_section.sx_to_bytes()) + bytes(nonce_section.sx_to_bytes())
+
+sig_mnt_hash_sha_256 = Datum([hash_sha_256(sig_bytes)])
+
+sig = sign(bob_sk, hash_sha_256(sig_bytes))
+
+sig_mnt_datum = Datum([bob_vk.to_string(), sig, tx_hash_01])
+
+sig_mnt_section = Section(sectionType.SIG_MINT, [sig_mnt_hash_sha_256, sig_mnt_datum])
+
+tx = Transaction([mint_outputs_section, nonce_section, sig_mnt_section])
+tx_hash_03 = hash_sha_256(tx.tx_to_bytes())
+
+if(txHC.insert_tx(tx)):
+    print("Success -- transaction accepted")
+else:
+    print("Failure -- transaction rejected")
+
+
 
 print("Test suites finished! Beginning fuzzing procedure...")
 
