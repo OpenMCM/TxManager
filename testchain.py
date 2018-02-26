@@ -694,7 +694,7 @@ if(txHC.insert_tx(tx)):
 else:
     print("Failure -- transaction rejected")
 
-print("Beginning Wildcard Test Suite...")
+print("\n\nBeginning Wildcard Test Suite...\n\n")
 
 # The colors of coins we're gonna trade:
 BTC = bytearray(b"\xbb\xbb\xbb\xbb" * 8)
@@ -790,10 +790,56 @@ if(txHC.insert_tx(tx)):
 else:
     print("Failure -- transaction rejected")
 
+# Bob trades his 2 ETH for Alice's 2 BTC
+inputs_datum = Datum([tx_hash_03, bytes([sectionType.MINT_OUTPUTS.value]), bytearray(b"\x00\x00\x00\x00")])
+inputs_section = Section(sectionType.INPUTS, [inputs_datum])
 
+outputs_datum = Datum([bob_ad, BTC, bytearray(b"\x00\x02\x00\x00")])
+outputs_section = Section(sectionType.OUTPUTS, [outputs_datum])
 
-print("Test suites finished! Beginning fuzzing procedure...")
+alice_pseudonym = bytearray(os.urandom(32))
+wildcard_outputs_datum = Datum([alice_pseudonym, ETH, bytearray(b"\x00\x02\x00\x00")])
+wildcard_outputs_section = Section(sectionType.WILDCARD_OUTPUTS, [wildcard_outputs_datum])
 
+tx_bytes = inputs_section.sx_to_bytes() + outputs_section.sx_to_bytes() + wildcard_outputs_section.sx_to_bytes()
+running_tx_hash = hash_sha_256(tx_bytes)
+sig = sign(bob_sk, running_tx_hash)
+
+sig_hash_datum = Datum([running_tx_hash])
+sig_datum = Datum([bob_vk.to_string(), sig])
+sig_section = Section(sectionType.SIGNATURES, [sig_hash_datum, sig_datum])
+
+wildcard_inputs_datum = Datum([tx_hash_02, bytes([sectionType.MINT_OUTPUTS.value]), bytearray(b"\x00\x00\x00\x00")])
+wildcard_inputs_section = Section(sectionType.WILDCARD_INPUTS, [wildcard_inputs_datum])
+
+wildcard_change_datum = Datum([alice_ad, BTC, bytearray(b"\x00\x00\x00\x00")])
+wildcard_change_section = Section(sectionType.WILDCARD_CHANGE, [wildcard_change_datum])
+
+wildcard_ids_datum = Datum([alice_pseudonym, alice_ad])
+wildcard_ids_section = Section(sectionType.WILDCARD_ID, [wildcard_ids_datum])
+
+tx_bytes += sig_section.sx_to_bytes() + wildcard_inputs_section.sx_to_bytes()
+tx_bytes += wildcard_change_section.sx_to_bytes() + wildcard_ids_section.sx_to_bytes()
+running_tx_hash = hash_sha_256(tx_bytes)
+alice_sig = sign(alice_sk, running_tx_hash)
+
+wildcard_sig_hash_datum = Datum([running_tx_hash])
+wildcard_sig_datum = Datum([alice_vk.to_string(), alice_sig])
+wildcard_sig_section = Section(sectionType.WILDCARD_SIGNATURES, [wildcard_sig_hash_datum, wildcard_sig_datum])
+
+tx = Transaction([inputs_section, outputs_section, wildcard_outputs_section, sig_section, wildcard_inputs_section, wildcard_change_section, wildcard_ids_section, wildcard_sig_section])
+
+tx_hash_04 = hash_sha_256(tx.tx_to_bytes())
+
+if(txHC.insert_tx(tx)):
+    print("Success -- transaction accepted")
+else:
+    print("Failure -- transaction rejected")
+
+print("\n\nTest suites finished! Beginning fuzzing procedure...\n\n")
+exit(1)
+
+# Fuzzing
 tx = random_tx()
 
 while(not txHC.insert_tx(tx)):

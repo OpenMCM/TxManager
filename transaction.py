@@ -93,6 +93,12 @@ def deauthed_minter_datum_well_formed(datum):
     else:
         return True
 
+def wildcard_id_datum_well_formed(datum):
+    if(len(datum.dx) != 2 or len(datum.dx[0]) != 32 or len(datum.dx[1]) != 32):
+        return False
+    else:
+        return True
+
 def nonce_section_well_formed(section):
     if(len(section.data) != 1 or len(section.data[0].dx) != 1 or len(section.data[0].dx[0]) != 32):
         return False
@@ -672,7 +678,8 @@ def transaction_is_valid(txHashChain, tx):
             for datum in sx.data:
                 if(not output_datum_well_formed(datum)):
                     # Fail
-                    print("Malformed output ", datum)
+                    print("Malformed output ")
+                    datum.dx_print()
                     return False
                 recipient = datum.dx[0]
                 color = bytes(datum.dx[1])
@@ -692,7 +699,8 @@ def transaction_is_valid(txHashChain, tx):
             for datum in sx.data:
                 if(not output_datum_well_formed(datum)):
                     # Fail
-                    print("Malformed output ", datum)
+                    print("Malformed burn output ")
+                    datum.dx_print()
                     return False
                 color = bytes(datum.dx[0])
                 quantity = int.from_bytes(datum.dx[1], byteorder='big', signed=False)
@@ -767,16 +775,18 @@ def transaction_is_valid(txHashChain, tx):
 
     # Check that we have seen all the required sections
     transfer_tx = set([sectionType.INPUTS, sectionType.OUTPUTS, sectionType.SIGNATURES])
-    tx_burn = set([sectionType.INPUTS, sectionType.SIGNATURES])
+    tx_donate = set([sectionType.INPUTS, sectionType.SIGNATURES])
+    tx_burn = set([sectionType.INPUTS, sectionType.BURN, sectionType.SIGNATURES])
     mint_tx = set([sectionType.NONCE, sectionType.MINT_OUTPUTS, sectionType.SIG_MINT])
     auth_tx = set([sectionType.NONCE, sectionType.AUTHED_MINTERS, sectionType.COINCOLOR])
     deauth_tx = set([sectionType.NONCE, sectionType.DEAUTHED_MINTERS, sectionType.COINCOLOR])
     auth_deauth_tx = set([sectionType.NONCE, sectionType.AUTHED_MINTERS, sectionType.DEAUTHED_MINTERS, sectionType.COINCOLOR])
+    wildcard_tx = set([sectionType.INPUTS, sectionType.OUTPUTS, sectionType.WILDCARD_OUTPUTS, sectionType.SIGNATURES, sectionType.WILDCARD_INPUTS, sectionType.WILDCARD_CHANGE, sectionType.WILDCARD_ID, sectionType.WILDCARD_SIGNATURES])
 
     # This bit is kinda dumb. Apparently sets aren't hashable in python, so we
     # need to check whether the transaction is well-formed for each possible
     # structure with a really big 'if' statement.
-    if(seen_secs == transfer_tx or seen_secs == mint_tx or seen_secs == auth_tx or seen_secs == deauth_tx or seen_secs == auth_deauth_tx or seen_secs == tx_burn):
+    if(seen_secs == transfer_tx or seen_secs == mint_tx or seen_secs == auth_tx or seen_secs == deauth_tx or seen_secs == auth_deauth_tx or seen_secs == tx_burn or seen_secs == wildcard_tx or seen_secs == tx_donate):
         return True
     else:
         print("Malformed transaction: ")
