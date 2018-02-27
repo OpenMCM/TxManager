@@ -19,6 +19,9 @@ DATA_END        = 0x7f
 TX_BEGIN        = 0xff
 TX_END          = 0x00
 
+MINT_FLAG  = bytearray(b"\x00")
+PAINT_FLAG = bytearray(b"\x01")
+
 class sectionType(Enum):
     INPUTS = 1
     OUTPUTS = 2
@@ -770,7 +773,7 @@ def transaction_is_valid(txHashChain, tx):
                 print("Error: non-negative entropy in coin color ", color)
                 return False
         except Exception as e:
-            print("\n\ne\n\n")
+            print("\n\n" + e + "\n\n")
             return False
 
     # Check that we have seen all the required sections
