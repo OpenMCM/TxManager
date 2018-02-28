@@ -615,6 +615,12 @@ def transaction_is_valid(txHashChain, tx):
                             # Datum is malformed
                             print("Error: malformed datum " + str(datum))
                             return False
+                    leftover_colors = paintable_colors.difference(colors_authed_to_paint)
+
+                    # If we don't have valid signatures for every color, then fail
+                    if(leftover_colors != set()):
+                        print("Error: Inadequate signatures for paintable colors")
+                        return False
                 else:
                     seen_auths += nonce
                     for datum in sx.data[:len(sx.data) - 1]:
@@ -901,9 +907,14 @@ def transaction_is_valid(txHashChain, tx):
             mint_paint_val = sx.data[0].dx[0]
             mint_paint = mint_paint_val
 
+        elif(sx.type == sectionType.PAINT_INPUTS):
+            seen_secs.add(sx.type)
+
+
         # Regardless of which section type we saw, we need to add it to the
-        # Seen_bytes
+        # seen_bytes and seen_secs
         seen_bytes += sx.sx_to_bytes()
+        seen_secs.add(sx.type)
 
     # Assert non-negative entropy
     for color in outputs.keys():
