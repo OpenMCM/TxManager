@@ -86,6 +86,26 @@ class TXHashChain:
             curr_hash = curr_block[0]
         return None
 
+    # Returns a set of paintable colors if the given color is paintable,
+    # and None otherwise.
+    def color_is_paintable(self, color):
+        curr_hash = self.most_recent_block
+
+        while curr_hash != bottom_hash:
+            curr_block = self.chain[curr_hash]
+            curr_tx = curr_block[1]
+            curr_tx_hash = hash_sha_256(curr_tx.tx_to_bytes())
+
+            coin_color_section = curr_tx.get_section(sectionType.COINCOLOR)
+            if(coin_color_section != None):
+                if(coin_color_section.data[0].dx[0] == color):
+                    mint_paint_section = curr_tx.get_section(sectionType.COINCOLOR)
+                    if(mint_paint_section != None and mint_paint_section.data[0].dx[0] == PAINT_FLAG):
+                        return set(coin_color_section.data[1:])
+
+            curr_hash = curr_block[0]
+        return None
+
     # Verifies that pubkeyhash is an authorized minter of the color specified
     # at txhash. Also verifies that pubkeyhash has not been deauthorized since
     # txhash was issued. Returns a set of colors.

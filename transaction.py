@@ -367,7 +367,7 @@ def transaction_is_valid(txHashChain, tx):
             return
 
     for sx in tx.sections:
-        if(sx.type == sectionType.INPUTS):
+        if(sx.type == sectionType.INPUTS or sx.type == sectionType.PAINT_INPUTS):
             check_section_duplicate(seen_secs, sx.type)
             seen_secs.add(sx.type)
             for datum in sx.data:
@@ -907,9 +907,68 @@ def transaction_is_valid(txHashChain, tx):
             mint_paint_val = sx.data[0].dx[0]
             mint_paint = mint_paint_val
 
-        elif(sx.type == sectionType.PAINT_INPUTS):
+        elif(sx.type == sectionType.PAINT_OUTPUTS):
             seen_secs.add(sx.type)
 
+            paintable_colors = set()
+
+            for datum in sx.data:
+                if(not output_datum_well_formed(datum)):
+                    print("Error: PAINT_OUTPUT malformed")
+                    return False
+
+                recipient = datum[0]
+                color = bytes(datum[1])
+                quantity = int.from_bytes(datum.dx[2], byteorder='big', signed=False)
+                p_c = txHashChain.paintable_colors()
+                if(color in outputs.keys()):
+                    outputs[color] += quantity
+                else:
+                    outputs[color] = quantity
+
+                if(p_c == None):
+                    # No colors are paintable for the given color! Return False
+                    print("Color not paintable ", color)
+                    return False
+
+                paintable_colors = paintable_colors.union(p_c)
+        elif(sx.type == sectionType.SIG_PAINT):
+            seen_secs.add(sx.type)
+
+            colors_authed_to_paint = set()
+
+            signers = set()
+
+            for datum in sx.data:
+                try:
+                    pubkey = datum.dx[0]
+                    sig = datum.dx[1]
+                    proof = datum.dx[2]
+
+                    addr = hash_sha_256(pubkey)
+
+                    signers.add(addr)
+
+                    c_a = txHashChain.get_authed_color(addr)
+                    colors_authed_to_paint = colors_authed_to_paint.union(c_a)
+
+                    h = hash_sha_256(bytes(seen_auths))
+
+                    vk = gen_pubkey_from_bytes(pubkey)
+                    verify(vk, h, sig)
+                except Exception as e:
+                    # Signature is invalid! Return False
+                    print("Invalid signature: ", sig_datum.dx)
+                    return False
+
+            leftover_signers = inputs_owners.difference(signers)
+            if(leftover_signers != set()):
+                print("Error: Not enough signers to authorize transaction")
+                print("Need signatures from: ", leftover_signers)
+
+            leftover_colors = outputs.keys().difference(colors_authed_to_paint)
+            if(leftover_colors != set()):
+                print("Error: Colors being painted without authorization")
 
         # Regardless of which section type we saw, we need to add it to the
         # seen_bytes and seen_secs
